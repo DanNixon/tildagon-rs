@@ -1,0 +1,37 @@
+[package]
+name = "tildagon-demo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+critical-section = "1.2.0"
+defmt = "1.0.1"
+embassy-executor = { version = "0.7.0", features = ["defmt", "task-arena-size-20480"] }
+embassy-futures = "0.1.2"
+embassy-sync = "0.6.2"
+embassy-time = { version = "0.4.0", features = ["defmt"] }
+embedded-graphics = "0.8.1"
+embedded-hal = "1.0.0"
+embedded-text = "0.7.2"
+esp-alloc = { version = "0.8.0", features = ["defmt"] }
+esp-bootloader-esp-idf = "0.1.0"
+esp-hal-embassy = { version = "0.8.1", features = ["defmt", "esp32s3"] }
+panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
+rtt-target = { version = "0.6.1", features = ["defmt"] }
+smart-leds = "0.4.0"
+static_cell = { version = "2.1.0", features = ["nightly"] }
+tildagon = { path = "../../", features = ["top-board-2024"] }
+
+[profile.dev]
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = "s"
+
+[profile.release]
+codegen-units    = 1     # LLVM can perform better optimizations using a single thread
+debug            = 2
+debug-assertions = false
+incremental      = false
+lto              = 'fat'
+opt-level        = 's'
+overflow-checks  = false
