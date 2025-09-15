@@ -50,6 +50,7 @@ jobs:
       matrix:
         example:
           - demo-2024
+          - demo-no-top-board
 
     steps:
       - uses: actions/checkout@v5
