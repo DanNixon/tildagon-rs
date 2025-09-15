@@ -1,5 +1,7 @@
 # Tildagon :heart: Rust
 
+[![Crates.io Version](https://img.shields.io/crates/v/tildagon)](https://crates.io/crates/tildagon)
+
 A Rust board support crate for the [Electromagnetic Field](https://www.emfcamp.org/) [Tildagon](https://tildagon.badge.emfcamp.org/) badge.
 
 Still quite early in development and things might change a bit, but very usable for badge creations that will not be reconfigured much.
