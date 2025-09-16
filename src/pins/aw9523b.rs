@@ -1,7 +1,8 @@
 use super::pin::PinExt;
 use core::marker::ConstParamTy;
 use defmt::{Format, debug};
-use embedded_hal::{digital::PinState, i2c::I2c};
+use embedded_hal::digital::PinState;
+use embedded_hal_async::i2c::I2c;
 
 #[derive(Format, Debug, Copy, Clone, PartialEq, Eq, ConstParamTy)]
 pub enum Port {
@@ -57,7 +58,7 @@ pub(super) enum Register {
     SW_RSTN = 0x7F,
 }
 
-pub(super) fn write_register<I2C, E>(
+pub(super) async fn write_register<I2C, E>(
     bus: &mut I2C,
     addr: u8,
     register: Register,
@@ -66,19 +67,24 @@ pub(super) fn write_register<I2C, E>(
 where
     I2C: I2c<Error = E>,
 {
-    bus.write(addr, &[register as u8, value])
+    bus.write(addr, &[register as u8, value]).await
 }
 
-pub(super) fn read_register<I2C, E>(bus: &mut I2C, addr: u8, register: Register) -> Result<u8, E>
+pub(super) async fn read_register<I2C, E>(
+    bus: &mut I2C,
+    addr: u8,
+    register: Register,
+) -> Result<u8, E>
 where
     I2C: I2c<Error = E>,
 {
     let mut val = [0u8; 1];
     bus.write_read(addr, &[register as u8], &mut val)
+        .await
         .and(Ok(val[0]))
 }
 
-pub(crate) fn set_pin_mode<I2C, E, PIN: PinExt>(
+pub(crate) async fn set_pin_mode<I2C, E, PIN: PinExt>(
     bus: &mut I2C,
     pin: &PIN,
     mode: PinMode,
@@ -91,20 +97,20 @@ where
         Port::Port1 => Register::LEDMS_P1,
     };
 
-    let value = read_register(bus, pin.address(), register)?;
+    let value = read_register(bus, pin.address(), register).await?;
 
     let value = match mode {
         PinMode::Gpio => value | pin.bit(),
         PinMode::Led => value & !pin.bit(),
     };
 
-    write_register(bus, pin.address(), register, value)?;
+    write_register(bus, pin.address(), register, value).await?;
 
     debug!("Set mode of pin {} to {}", pin, mode);
     Ok(())
 }
 
-pub(crate) fn set_io_direction<I2C, E, PIN: PinExt + ?Sized>(
+pub(crate) async fn set_io_direction<I2C, E, PIN: PinExt + ?Sized>(
     bus: &mut I2C,
     pin: &PIN,
     direction: GpioDirection,
@@ -117,20 +123,20 @@ where
         Port::Port1 => Register::CONFIG_P1,
     };
 
-    let value = read_register(bus, pin.address(), register)?;
+    let value = read_register(bus, pin.address(), register).await?;
 
     let value = match direction {
         GpioDirection::Input => value | pin.bit(),
         GpioDirection::Output => value & !pin.bit(),
     };
 
-    write_register(bus, pin.address(), register, value)?;
+    write_register(bus, pin.address(), register, value).await?;
 
     debug!("Set IO direction of pin {} to {}", pin, direction);
     Ok(())
 }
 
-pub(crate) fn set_io_state<I2C, E, PIN: PinExt + ?Sized>(
+pub(crate) async fn set_io_state<I2C, E, PIN: PinExt + ?Sized>(
     bus: &mut I2C,
     pin: &PIN,
     state: PinState,
@@ -143,14 +149,14 @@ where
         Port::Port1 => Register::OUTPUT_P1,
     };
 
-    let value = read_register(bus, pin.address(), register)?;
+    let value = read_register(bus, pin.address(), register).await?;
 
     let value = match state {
         PinState::Low => value & !pin.bit(),
         PinState::High => value | pin.bit(),
     };
 
-    write_register(bus, pin.address(), register, value)?;
+    write_register(bus, pin.address(), register, value).await?;
 
     debug!("Set pin {} to {}", pin, state);
     Ok(())

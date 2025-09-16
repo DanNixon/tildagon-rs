@@ -1,8 +1,8 @@
 #[cfg(not(feature = "top-board-none"))]
 use crate::hexpansion_slots::HexpansionSlot;
-use crate::{pins::LedPins, resources::LedResources};
+use crate::{pins::LedPins, pins::async_digital::OutputPin, resources::LedResources};
 use defmt::Format;
-use embedded_hal::digital::{ErrorKind, OutputPin, PinState};
+use embedded_hal::digital::{ErrorKind, PinState};
 use esp_hal::{
     Async,
     rmt::{Channel, ChannelCreator},
@@ -20,30 +20,32 @@ pub struct Leds<I2C> {
 
 impl<I2C, E> Leds<I2C>
 where
-    I2C: embedded_hal::i2c::I2c<Error = E>,
+    I2C: embedded_hal_async::i2c::I2c<Error = E>,
 {
-    pub fn try_new(
+    pub async fn try_new(
         i2c: I2C,
         pins: LedPins,
-        r: LedResources,
+        r: LedResources<'static>,
         rmt_ch: ChannelCreator<Async, 0>,
     ) -> Result<Self, E> {
         let buffer = [0_u32; buffer_size_async(LED_COUNT)];
         let leds = SmartLedsAdapterAsync::new(rmt_ch, r.data, buffer);
 
         Ok(Self {
-            led_power: pins.power_enable.into_output(i2c)?,
+            led_power: pins.power_enable.into_output(i2c).await?,
             leds,
             intensity: 255,
             pixels: [RGB8::default(); LED_COUNT],
         })
     }
 
-    pub fn set_power(&mut self, on: bool) -> Result<(), ErrorKind> {
-        self.led_power.set_state(match on {
-            true => PinState::High,
-            false => PinState::Low,
-        })
+    pub async fn set_power(&mut self, on: bool) -> Result<(), ErrorKind> {
+        self.led_power
+            .set_state(match on {
+                true => PinState::High,
+                false => PinState::Low,
+            })
+            .await
     }
 
     pub async fn write(&mut self) -> Result<(), LedAdapterError> {

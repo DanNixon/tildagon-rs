@@ -1,7 +1,7 @@
 mod tca9548a;
 
 use crate::resources::I2cResources;
-use core::cell::RefCell;
+use embassy_sync::mutex::Mutex;
 use esp_hal::{
     Async,
     gpio::{Level, Output},
@@ -11,7 +11,14 @@ use esp_hal::{
 
 pub type I2c = esp_hal::i2c::master::I2c<'static, Async>;
 
-pub async fn i2c_bus(r: I2cResources<'static>) -> (RefCell<I2c>, Output<'static>) {
+// TODO: should this be configurable via a feature?
+pub type SharingRawMutex = embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+
+pub type SharedI2cBus<BUS> = Mutex<SharingRawMutex, BUS>;
+pub type SharedI2cDevice<BUS> =
+    embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice<'static, SharingRawMutex, BUS>;
+
+pub async fn i2c_bus(r: I2cResources<'static>) -> (SharedI2cBus<I2c>, Output<'static>) {
     let config = Config::default().with_frequency(Rate::from_khz(100));
 
     defmt::info!("conf: {}", config);
@@ -27,7 +34,7 @@ pub async fn i2c_bus(r: I2cResources<'static>) -> (RefCell<I2c>, Output<'static>
     embassy_time::Timer::after_millis(10).await;
     reset.set_high();
 
-    (RefCell::new(i2c), reset)
+    (SharedI2cBus::new(i2c), reset)
 }
 
 macro_rules! define_i2c_bus {
@@ -36,9 +43,9 @@ macro_rules! define_i2c_bus {
             $crate::i2c::tca9548a::Bus<I2c, { $crate::i2c::tca9548a::BusNumber::$bus }>;
 
         pub fn $fn_name(
-            i2c: &'static core::cell::RefCell<I2c>,
-        ) -> core::cell::RefCell<$crate::i2c::$bus_name> {
-            core::cell::RefCell::new($crate::i2c::tca9548a::Bus::new(&i2c))
+            i2c: &'static $crate::i2c::SharedI2cBus<I2c>,
+        ) -> $crate::i2c::SharedI2cBus<$crate::i2c::$bus_name> {
+            $crate::i2c::SharedI2cBus::new($crate::i2c::tca9548a::Bus::new(&i2c))
         }
     };
 }
@@ -51,97 +58,3 @@ define_i2c_bus!(hexpansion_c_i2c_bus, HexpansionCI2cBus, Bus3);
 define_i2c_bus!(hexpansion_d_i2c_bus, HexpansionDI2cBus, Bus4);
 define_i2c_bus!(hexpansion_e_i2c_bus, HexpansionEI2cBus, Bus5);
 define_i2c_bus!(hexpansion_f_i2c_bus, HexpansionFI2cBus, Bus6);
-
-pub struct SharedI2cDevice<T: 'static> {
-    bus: &'static RefCell<T>,
-}
-
-impl<T> SharedI2cDevice<T> {
-    #[inline]
-    pub fn new(bus: &'static RefCell<T>) -> Self {
-        Self { bus }
-    }
-}
-
-impl<T> embedded_hal::i2c::ErrorType for SharedI2cDevice<T>
-where
-    T: embedded_hal::i2c::I2c,
-{
-    type Error = T::Error;
-}
-
-impl<T> embedded_hal::i2c::I2c for SharedI2cDevice<T>
-where
-    T: embedded_hal::i2c::I2c,
-{
-    #[inline]
-    fn read(&mut self, address: u8, read: &mut [u8]) -> Result<(), Self::Error> {
-        let bus = &mut *self.bus.borrow_mut();
-        bus.read(address, read)
-    }
-
-    #[inline]
-    fn write(&mut self, address: u8, write: &[u8]) -> Result<(), Self::Error> {
-        let bus = &mut *self.bus.borrow_mut();
-        bus.write(address, write)
-    }
-
-    #[inline]
-    fn write_read(
-        &mut self,
-        address: u8,
-        write: &[u8],
-        read: &mut [u8],
-    ) -> Result<(), Self::Error> {
-        let bus = &mut *self.bus.borrow_mut();
-        bus.write_read(address, write, read)
-    }
-
-    #[inline]
-    fn transaction(
-        &mut self,
-        address: u8,
-        operations: &mut [embedded_hal::i2c::Operation<'_>],
-    ) -> Result<(), Self::Error> {
-        let bus = &mut *self.bus.borrow_mut();
-        bus.transaction(address, operations)
-    }
-}
-
-// impl<T> embedded_hal_async::i2c::I2c for SharedI2cDevice<T>
-// where
-//     T: embedded_hal_async::i2c::I2c + embedded_hal::i2c::I2c,
-// {
-//     #[inline]
-//     async fn read(&mut self, address: u8, read: &mut [u8]) -> Result<(), Self::Error> {
-//         let bus = &mut *self.bus.borrow_mut();
-//         embedded_hal_async::i2c::I2c::read(bus, address, read).await
-//     }
-
-//     #[inline]
-//     async fn write(&mut self, address: u8, write: &[u8]) -> Result<(), Self::Error> {
-//         let bus = &mut *self.bus.borrow_mut();
-//         embedded_hal_async::i2c::I2c::write(bus, address, write).await
-//     }
-
-//     #[inline]
-//     async fn write_read(
-//         &mut self,
-//         address: u8,
-//         write: &[u8],
-//         read: &mut [u8],
-//     ) -> Result<(), Self::Error> {
-//         let bus = &mut *self.bus.borrow_mut();
-//         embedded_hal_async::i2c::I2c::write_read(bus, address, write, read).await
-//     }
-
-//     #[inline]
-//     async fn transaction(
-//         &mut self,
-//         address: u8,
-//         operations: &mut [embedded_hal::i2c::Operation<'_>],
-//     ) -> Result<(), Self::Error> {
-//         let bus = &mut *self.bus.borrow_mut();
-//         embedded_hal_async::i2c::I2c::transaction(bus, address, operations).await
-//     }
-// }

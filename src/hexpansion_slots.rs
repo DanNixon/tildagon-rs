@@ -5,7 +5,7 @@ use crate::pins::{
 };
 use defmt::{Format, debug};
 use embassy_time::Instant;
-use embedded_hal::{digital::PinState, i2c::I2c};
+use embedded_hal::digital::PinState;
 use getset::Getters;
 use heapless::Vec;
 
@@ -19,14 +19,14 @@ pub struct HexpansionSlotControl<I2C> {
 
 impl<I2C, E> HexpansionSlotControl<I2C>
 where
-    I2C: I2c<Error = E>,
+    I2C: embedded_hal_async::i2c::I2c<Error = E>,
 {
-    pub fn try_new(mut i2c: I2C, pins: HexpansionDetectPins) -> Result<Self, E> {
+    pub async fn try_new(mut i2c: I2C, pins: HexpansionDetectPins) -> Result<Self, E> {
         macro_rules! setup_pin {
             ($bus:expr, $pin:expr) => {
-                set_pin_mode($bus, &$pin, PinMode::Gpio)?;
-                set_io_direction($bus, &$pin, GpioDirection::Output)?;
-                set_io_state($bus, &$pin, PinState::High)?;
+                set_pin_mode($bus, &$pin, PinMode::Gpio).await?;
+                set_io_direction($bus, &$pin, GpioDirection::Output).await?;
+                set_io_state($bus, &$pin, PinState::High).await?;
             };
         }
 
@@ -45,7 +45,7 @@ where
         Ok(Self { i2c, pins, state })
     }
 
-    pub fn set_enabled(&mut self, slot: HexpansionSlot, enabled: bool) -> Result<(), E> {
+    pub async fn set_enabled(&mut self, slot: HexpansionSlot, enabled: bool) -> Result<(), E> {
         let pin: &dyn PinExt = match slot {
             HexpansionSlot::A => &self.pins.a,
             HexpansionSlot::B => &self.pins.b,
@@ -56,11 +56,11 @@ where
         };
 
         let state = if enabled {
-            set_io_direction(&mut self.i2c, pin, GpioDirection::Input)?;
+            set_io_direction(&mut self.i2c, pin, GpioDirection::Input).await?;
             None
         } else {
-            set_io_direction(&mut self.i2c, pin, GpioDirection::Output)?;
-            set_io_state(&mut self.i2c, pin, PinState::High)?;
+            set_io_direction(&mut self.i2c, pin, GpioDirection::Output).await?;
+            set_io_state(&mut self.i2c, pin, PinState::High).await?;
             Some(HexpansionState::Disabled)
         };
 
