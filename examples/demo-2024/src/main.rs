@@ -6,7 +6,6 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use core::cell::RefCell;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_futures::select::{Either, select};
@@ -23,7 +22,6 @@ use embedded_graphics::{
     prelude::{Dimensions, Point, RgbColor, Size},
     primitives::Rectangle,
 };
-use embedded_hal::digital::OutputPin;
 use embedded_text::{
     TextBox,
     alignment::{HorizontalAlignment, VerticalAlignment},
@@ -41,9 +39,9 @@ use tildagon::{
     hexpansion_slots::{
         HexpansionSlot, HexpansionSlotControl, HexpansionSlotEvent, HexpansionState,
     },
-    i2c::{SharedI2cDevice, SystemI2cBus},
+    i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
     leds::Leds,
-    pins::PinControl,
+    pins::{PinControl, async_digital::OutputPin},
     resources::*,
 };
 
@@ -68,29 +66,33 @@ async fn main(spawner: Spawner) {
     let timer0 = SystemTimer::new(p.SYSTIMER);
     esp_hal_embassy::init(timer0.alarm0);
 
-    static I2C_BUS: StaticCell<RefCell<tildagon::i2c::I2c>> = StaticCell::new();
+    static I2C_BUS: StaticCell<SharedI2cBus<tildagon::i2c::I2c>> = StaticCell::new();
     let (bus, _reset) = tildagon::i2c::i2c_bus(r.i2c).await;
     let i2c_bus = I2C_BUS.init(bus);
 
-    static I2C_SYSTEM: StaticCell<RefCell<tildagon::i2c::SystemI2cBus>> = StaticCell::new();
+    static I2C_SYSTEM: StaticCell<SharedI2cBus<tildagon::i2c::SystemI2cBus>> = StaticCell::new();
     let i2c_system = I2C_SYSTEM.init(tildagon::i2c::system_i2c_bus(i2c_bus));
 
     let mut pin_control = PinControl::new(i2c_system);
     // pin_control.reset().unwrap();
-    pin_control.init().unwrap();
+    pin_control.init().await.unwrap();
     let pins = pin_control.pins();
 
     let mut usb_sel = pins
         .other
         .usb_select
         .into_output(SharedI2cDevice::new(i2c_system))
+        .await
         .unwrap();
-    usb_sel.set_low().unwrap();
+    usb_sel.set_low().await.unwrap();
 
-    let mut buttons = Buttons::try_new(SharedI2cDevice::new(i2c_system), pins.button).unwrap();
+    let mut buttons = Buttons::try_new(SharedI2cDevice::new(i2c_system), pins.button)
+        .await
+        .unwrap();
 
     let mut hex_slots =
         HexpansionSlotControl::try_new(SharedI2cDevice::new(i2c_system), pins.hexpansion_detect)
+            .await
             .unwrap();
 
     let rmt: Rmt<'_, esp_hal::Async> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap().into_async();
@@ -101,8 +103,9 @@ async fn main(spawner: Spawner) {
         r.led,
         rmt.channel0,
     )
+    .await
     .unwrap();
-    leds.set_power(true).unwrap();
+    leds.set_power(true).await.unwrap();
 
     spawner.must_spawn(display_task(r.top_board, r.display));
     spawner.must_spawn(led_task(leds));
@@ -120,7 +123,7 @@ async fn main(spawner: Spawner) {
     loop {
         match select(tick.next(), hex_control_sub.next_message()).await {
             Either::First(_) => {
-                let regs = pin_control.read_input_registers().unwrap();
+                let regs = pin_control.read_input_registers().await.unwrap();
 
                 for event in buttons.update(&regs) {
                     info!("Button event: {}", event);
@@ -134,7 +137,7 @@ async fn main(spawner: Spawner) {
             }
             Either::Second(WaitResult::Lagged(_)) => panic!(),
             Either::Second(WaitResult::Message(msg)) => {
-                hex_slots.set_enabled(msg.slot, msg.enable).unwrap();
+                hex_slots.set_enabled(msg.slot, msg.enable).await.unwrap();
             }
         }
     }

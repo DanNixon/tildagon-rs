@@ -66,25 +66,25 @@ impl<const ADDRESS: u8, const PORT: Port, const PIN: u8> Pin<ADDRESS, PORT, PIN>
         Self {}
     }
 
-    pub fn into_output<I2C, E>(self, bus: I2C) -> Result<OutputPin<I2C>, E>
+    pub async fn into_output<I2C, E>(self, bus: I2C) -> Result<OutputPin<I2C>, E>
     where
-        I2C: embedded_hal::i2c::I2c<Error = E>,
+        I2C: embedded_hal_async::i2c::I2c<Error = E>,
     {
-        OutputPin::try_new(bus, self.into())
+        OutputPin::try_new(bus, self.into()).await
     }
 
-    pub fn into_input<I2C, E>(self, bus: I2C) -> Result<InputPin<I2C>, E>
+    pub async fn into_input<I2C, E>(self, bus: I2C) -> Result<InputPin<I2C>, E>
     where
-        I2C: embedded_hal::i2c::I2c<Error = E>,
+        I2C: embedded_hal_async::i2c::I2c<Error = E>,
     {
-        InputPin::try_new(bus, self.into())
+        InputPin::try_new(bus, self.into()).await
     }
 
-    pub fn into_led<I2C, E>(self, bus: I2C) -> Result<LedPin<I2C>, E>
+    pub async fn into_led<I2C, E>(self, bus: I2C) -> Result<LedPin<I2C>, E>
     where
-        I2C: embedded_hal::i2c::I2c<Error = E>,
+        I2C: embedded_hal_async::i2c::I2c<Error = E>,
     {
-        LedPin::try_new(bus, self.into())
+        LedPin::try_new(bus, self.into()).await
     }
 }
 

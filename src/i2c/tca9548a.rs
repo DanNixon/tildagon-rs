@@ -1,5 +1,7 @@
-use core::{cell::RefCell, marker::ConstParamTy};
-use embedded_hal::i2c::{ErrorType, I2c, Operation};
+use core::marker::ConstParamTy;
+use embedded_hal_async::i2c::{ErrorType, I2c, Operation};
+
+use super::SharedI2cBus;
 
 #[derive(ConstParamTy, PartialEq, Eq)]
 #[repr(u8)]
@@ -14,13 +16,13 @@ pub enum BusNumber {
     Bus7 = 0b10000000,
 }
 
-pub struct Bus<I2C: 'static, const BUS: BusNumber> {
-    parent_bus: &'static RefCell<I2C>,
+pub struct Bus<BUS: 'static, const N: BusNumber> {
+    parent_bus: &'static SharedI2cBus<BUS>,
     mux_address: u8,
 }
 
-impl<I2C, const BUS: BusNumber> Bus<I2C, BUS> {
-    pub fn new(bus: &'static RefCell<I2C>) -> Self {
+impl<BUS, const N: BusNumber> Bus<BUS, N> {
+    pub fn new(bus: &'static SharedI2cBus<BUS>) -> Self {
         Self {
             parent_bus: bus,
             mux_address: 0x77,
@@ -28,51 +30,51 @@ impl<I2C, const BUS: BusNumber> Bus<I2C, BUS> {
     }
 }
 
-impl<I2C, const BUS: BusNumber> ErrorType for Bus<I2C, BUS>
+impl<BUS, const N: BusNumber> ErrorType for Bus<BUS, N>
 where
-    I2C: I2c,
+    BUS: ErrorType,
 {
-    type Error = I2C::Error;
+    type Error = BUS::Error;
 }
 
-impl<I2C, const BUS: BusNumber> I2c for Bus<I2C, BUS>
+impl<BUS, const N: BusNumber> I2c for Bus<BUS, N>
 where
-    I2C: I2c,
+    BUS: I2c,
 {
     #[inline]
-    fn read(&mut self, address: u8, read: &mut [u8]) -> Result<(), Self::Error> {
-        let bus = &mut *self.parent_bus.borrow_mut();
-        bus.write(self.mux_address, &[BUS as u8])?;
-        bus.read(address, read)
+    async fn read(&mut self, address: u8, read: &mut [u8]) -> Result<(), Self::Error> {
+        let mut bus = self.parent_bus.lock().await;
+        bus.write(self.mux_address, &[N as u8]).await?;
+        bus.read(address, read).await
     }
 
     #[inline]
-    fn write(&mut self, address: u8, write: &[u8]) -> Result<(), Self::Error> {
-        let bus = &mut *self.parent_bus.borrow_mut();
-        bus.write(self.mux_address, &[BUS as u8])?;
-        bus.write(address, write)
+    async fn write(&mut self, address: u8, write: &[u8]) -> Result<(), Self::Error> {
+        let mut bus = self.parent_bus.lock().await;
+        bus.write(self.mux_address, &[N as u8]).await?;
+        bus.write(address, write).await
     }
 
     #[inline]
-    fn write_read(
+    async fn write_read(
         &mut self,
         address: u8,
         write: &[u8],
         read: &mut [u8],
     ) -> Result<(), Self::Error> {
-        let bus = &mut *self.parent_bus.borrow_mut();
-        bus.write(self.mux_address, &[BUS as u8])?;
-        bus.write_read(address, write, read)
+        let mut bus = self.parent_bus.lock().await;
+        bus.write(self.mux_address, &[N as u8]).await?;
+        bus.write_read(address, write, read).await
     }
 
     #[inline]
-    fn transaction(
+    async fn transaction(
         &mut self,
         address: u8,
         operations: &mut [Operation<'_>],
     ) -> Result<(), Self::Error> {
-        let bus = &mut *self.parent_bus.borrow_mut();
-        bus.write(self.mux_address, &[BUS as u8])?;
-        bus.transaction(address, operations)
+        let mut bus = self.parent_bus.lock().await;
+        bus.write(self.mux_address, &[N as u8]).await?;
+        bus.transaction(address, operations).await
     }
 }

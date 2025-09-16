@@ -13,6 +13,8 @@ top-board-2024 = []
 
 [dependencies]
 defmt = "1.0.1"
+embassy-embedded-hal = { version = "0.3.2", features = ["defmt"] }
+embassy-sync = { version = "0.6.2", features = ["defmt"] }
 embassy-time = { version = "0.4.0", features = ["defmt"] }
 embedded-graphics = "0.8.1"
 embedded-hal = "1.0.0"

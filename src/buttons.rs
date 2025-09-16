@@ -4,7 +4,6 @@ use crate::pins::{
 };
 use defmt::{Format, debug};
 use embassy_time::{Duration, Instant};
-use embedded_hal::i2c::I2c;
 use getset::Getters;
 use heapless::Vec;
 
@@ -16,14 +15,14 @@ pub struct Buttons {
 }
 
 impl Buttons {
-    pub fn try_new<I2C, E>(mut i2c: I2C, pins: ButtonPins) -> Result<Self, E>
+    pub async fn try_new<I2C, E>(mut i2c: I2C, pins: ButtonPins) -> Result<Self, E>
     where
-        I2C: I2c<Error = E>,
+        I2C: embedded_hal_async::i2c::I2c<Error = E>,
     {
         macro_rules! setup_button {
             ($bus:expr, $pin:expr) => {
-                set_pin_mode($bus, &$pin, PinMode::Gpio)?;
-                set_io_direction($bus, &$pin, GpioDirection::Input)?;
+                set_pin_mode($bus, &$pin, PinMode::Gpio).await?;
+                set_io_direction($bus, &$pin, GpioDirection::Input).await?;
             };
         }
 

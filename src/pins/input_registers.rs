@@ -15,9 +15,9 @@ pub struct InputRegisters {
 }
 
 impl InputRegisters {
-    pub(crate) fn read<I2C, E>(i2c: &mut I2C) -> Result<Self, E>
+    pub(crate) async fn read<I2C, E>(i2c: &mut I2C) -> Result<Self, E>
     where
-        I2C: embedded_hal::i2c::I2c<Error = E>,
+        I2C: embedded_hal_async::i2c::I2c<Error = E>,
     {
         let mut val = [0u8; 2];
 
@@ -25,21 +25,24 @@ impl InputRegisters {
             0x58,
             &[Register::INPUT_P0 as u8, Register::INPUT_P1 as u8],
             &mut val,
-        )?;
+        )
+        .await?;
         let (a0x58_port0, a0x58_port1) = (val[0], val[1]);
 
         i2c.write_read(
             0x59,
             &[Register::INPUT_P0 as u8, Register::INPUT_P1 as u8],
             &mut val,
-        )?;
+        )
+        .await?;
         let (a0x59_port0, a0x59_port1) = (val[0], val[1]);
 
         i2c.write_read(
             0x5a,
             &[Register::INPUT_P0 as u8, Register::INPUT_P1 as u8],
             &mut val,
-        )?;
+        )
+        .await?;
         let (a0x5a_port0, a0x5a_port1) = (val[0], val[1]);
 
         Ok(Self {

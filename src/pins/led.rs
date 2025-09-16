@@ -3,10 +3,7 @@ use super::{
     pin::{PinExt, TypeErasedPin},
 };
 use defmt::debug;
-use embedded_hal::{
-    i2c::I2c,
-    pwm::{ErrorKind, SetDutyCycle},
-};
+use embedded_hal::pwm::ErrorKind;
 
 pub struct LedPin<I2C> {
     bus: I2C,
@@ -15,10 +12,10 @@ pub struct LedPin<I2C> {
 
 impl<I2C, E> LedPin<I2C>
 where
-    I2C: I2c<Error = E>,
+    I2C: embedded_hal_async::i2c::I2c<Error = E>,
 {
-    pub(crate) fn try_new(mut bus: I2C, pin: TypeErasedPin) -> Result<Self, E> {
-        set_pin_mode(&mut bus, &pin, PinMode::Led)?;
+    pub(crate) async fn try_new(mut bus: I2C, pin: TypeErasedPin) -> Result<Self, E> {
+        set_pin_mode(&mut bus, &pin, PinMode::Led).await?;
         Ok(Self { bus, pin })
     }
 }
@@ -27,15 +24,15 @@ impl<I2C> embedded_hal::pwm::ErrorType for LedPin<I2C> {
     type Error = ErrorKind;
 }
 
-impl<I2C, E> SetDutyCycle for LedPin<I2C>
+impl<I2C, E> super::async_pwm::SetDutyCycle for LedPin<I2C>
 where
-    I2C: I2c<Error = E>,
+    I2C: embedded_hal_async::i2c::I2c<Error = E>,
 {
-    fn max_duty_cycle(&self) -> u16 {
+    async fn max_duty_cycle(&self) -> u16 {
         255
     }
 
-    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+    async fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
         let register = match (self.pin.port(), self.pin.pin()) {
             (Port::Port0, 0) => Register::DIM4_P00,
             (Port::Port0, 1) => Register::DIM5_P01,
@@ -57,6 +54,7 @@ where
         };
 
         write_register(&mut self.bus, self.pin.address(), register, duty as u8)
+            .await
             .map_err(|_| ErrorKind::Other)?;
 
         debug!("Set pin {} to {}", self.pin, duty);
