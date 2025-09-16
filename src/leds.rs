@@ -4,15 +4,15 @@ use crate::{pins::LedPins, pins::async_digital::OutputPin, resources::LedResourc
 use defmt::Format;
 use embedded_hal::digital::{ErrorKind, PinState};
 use esp_hal::{
-    Async,
+    Blocking,
     rmt::{Channel, ChannelCreator},
 };
-use esp_hal_smartled::{LedAdapterError, SmartLedsAdapterAsync, buffer_size_async};
-use smart_leds::{RGB8, SmartLedsWriteAsync, brightness, gamma};
+use esp_hal_smartled::{LedAdapterError, SmartLedsAdapter, buffer_size_async};
+use smart_leds::{RGB8, SmartLedsWrite, brightness, gamma};
 
 pub struct Leds<I2C> {
     led_power: crate::pins::OutputPin<I2C>,
-    leds: SmartLedsAdapterAsync<Channel<Async, 0>, { LED_COUNT * 25 }>,
+    leds: SmartLedsAdapter<Channel<Blocking, 0>, { LED_COUNT * 25 }>,
 
     pub intensity: u8,
     pub pixels: [RGB8; LED_COUNT],
@@ -26,10 +26,10 @@ where
         i2c: I2C,
         pins: LedPins,
         r: LedResources<'static>,
-        rmt_ch: ChannelCreator<Async, 0>,
+        rmt_ch: ChannelCreator<Blocking, 0>,
     ) -> Result<Self, E> {
         let buffer = [0_u32; buffer_size_async(LED_COUNT)];
-        let leds = SmartLedsAdapterAsync::new(rmt_ch, r.data, buffer);
+        let leds = SmartLedsAdapter::new(rmt_ch, r.data, buffer);
 
         Ok(Self {
             led_power: pins.power_enable.into_output(i2c).await?,
@@ -48,10 +48,9 @@ where
             .await
     }
 
-    pub async fn write(&mut self) -> Result<(), LedAdapterError> {
+    pub fn write(&mut self) -> Result<(), LedAdapterError> {
         self.leds
             .write(brightness(gamma(self.pixels.into_iter()), self.intensity))
-            .await
     }
 
     pub fn main_board_pixel(&mut self) -> &mut RGB8 {

@@ -74,7 +74,7 @@ async fn main(spawner: Spawner) {
             .await
             .unwrap();
 
-    let rmt: Rmt<'_, esp_hal::Async> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap().into_async();
+    let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
     let mut leds = Leds::try_new(
         SharedI2cDevice::new(i2c_system),
@@ -175,12 +175,12 @@ async fn led_task(mut leds: Leds<SharedI2cDevice<SystemI2cBus>>) {
                     HexpansionState::Empty => HEX_EMPTY_COLOUR,
                     HexpansionState::Occupied => HEX_OCCUPIED_COLOUR,
                 };
-                leds.write().await.unwrap();
+                leds.write().unwrap();
 
                 Timer::after_millis(50).await;
 
                 *leds.main_board_pixel() = RGB8::new(0, 0, 0);
-                leds.write().await.unwrap();
+                leds.write().unwrap();
             }
         }
     }
