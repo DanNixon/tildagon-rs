@@ -106,7 +106,7 @@ async fn main(spawner: Spawner) {
             .await
             .unwrap();
 
-    let rmt: Rmt<'_, esp_hal::Async> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap().into_async();
+    let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
     let mut leds = Leds::try_new(
         SharedI2cDevice::new(i2c_system),
@@ -289,7 +289,7 @@ async fn led_task(mut leds: Leds<SharedI2cDevice<SystemI2cBus>>) {
 
     *leds.main_board_pixel() = RGB8::new(128, 0, 128);
 
-    leds.write().await.unwrap();
+    leds.write().unwrap();
 
     let mut colour = Hsv {
         hue: 0,
@@ -297,7 +297,7 @@ async fn led_task(mut leds: Leds<SharedI2cDevice<SystemI2cBus>>) {
         val: 127,
     };
 
-    let mut front_pixel_tick = Ticker::every(Duration::from_millis(100));
+    let mut front_pixel_tick = Ticker::every(Duration::from_millis(50));
     let mut event_sub = EVENT_CHANNEL.subscriber().unwrap();
 
     loop {
@@ -310,7 +310,7 @@ async fn led_task(mut leds: Leds<SharedI2cDevice<SystemI2cBus>>) {
                     HexpansionState::Occupied => HEX_OCCUPIED_COLOUR,
                 };
 
-                leds.write().await.unwrap();
+                leds.write().unwrap();
             }
             Either::First(_) => {}
             Either::Second(_) => {
@@ -320,7 +320,7 @@ async fn led_task(mut leds: Leds<SharedI2cDevice<SystemI2cBus>>) {
                     .iter_mut()
                     .for_each(|d| *d = hsv2rgb(colour));
 
-                leds.write().await.unwrap();
+                leds.write().unwrap();
             }
         }
     }
