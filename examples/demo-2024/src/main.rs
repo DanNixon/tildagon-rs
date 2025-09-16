@@ -6,6 +6,7 @@
     holding buffers for the duration of a data transfer."
 )]
 
+use core::ptr::addr_of_mut;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_futures::select::{Either, select};
@@ -27,6 +28,7 @@ use embedded_text::{
     alignment::{HorizontalAlignment, VerticalAlignment},
     style::TextBoxStyleBuilder,
 };
+use esp_hal_embassy::Executor;
 use panic_rtt_target as _;
 use smart_leds::{
     RGB8,
@@ -35,7 +37,14 @@ use smart_leds::{
 use static_cell::StaticCell;
 use tildagon::{
     buttons::{Button, ButtonEvent, ButtonState, Buttons},
-    esp_hal::{self, clock::CpuClock, rmt::Rmt, time::Rate, timer::systimer::SystemTimer},
+    esp_hal::{
+        self,
+        clock::CpuClock,
+        rmt::Rmt,
+        system::{CpuControl, Stack},
+        time::Rate,
+        timer::systimer::SystemTimer,
+    },
     hexpansion_slots::{
         HexpansionSlot, HexpansionSlotControl, HexpansionSlotEvent, HexpansionState,
     },
@@ -50,6 +59,8 @@ extern crate alloc;
 // This creates a default app-descriptor required by the esp-idf bootloader.
 // For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
 esp_bootloader_esp_idf::esp_app_desc!();
+
+static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
@@ -107,7 +118,17 @@ async fn main(spawner: Spawner) {
     .unwrap();
     leds.set_power(true).await.unwrap();
 
-    spawner.must_spawn(display_task(r.top_board, r.display));
+    let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+    let _guard = cpu_control
+        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
+            static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+            let executor = EXECUTOR.init(Executor::new());
+            executor.run(|spawner| {
+                spawner.must_spawn(display_task(r.top_board, r.display));
+            });
+        })
+        .unwrap();
+
     spawner.must_spawn(led_task(leds));
     spawner.must_spawn(button_logic_task());
 
