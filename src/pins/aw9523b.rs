@@ -106,7 +106,13 @@ where
 
     write_register(bus, pin.address(), register, value).await?;
 
-    debug!("Set mode of pin {} to {}", pin, mode);
+    debug!(
+        "Set mode of pin 0x{:x}/{}/{} to {}",
+        pin.address(),
+        pin.port(),
+        pin.pin(),
+        mode
+    );
     Ok(())
 }
 
@@ -132,7 +138,13 @@ where
 
     write_register(bus, pin.address(), register, value).await?;
 
-    debug!("Set IO direction of pin {} to {}", pin, direction);
+    debug!(
+        "Set IO direction of pin 0x{:x}/{}/{} to {}",
+        pin.address(),
+        pin.port(),
+        pin.pin(),
+        direction
+    );
     Ok(())
 }
 
@@ -158,6 +170,12 @@ where
 
     write_register(bus, pin.address(), register, value).await?;
 
-    debug!("Set pin {} to {}", pin, state);
+    debug!(
+        "Set pin 0x{:x}/{}/{} to {}",
+        pin.address(),
+        pin.port(),
+        pin.pin(),
+        state
+    );
     Ok(())
 }
