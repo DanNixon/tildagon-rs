@@ -1,3 +1,4 @@
+pub mod scan;
 mod tca9548a;
 
 use crate::resources::I2cResources;

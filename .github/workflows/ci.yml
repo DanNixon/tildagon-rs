@@ -51,6 +51,7 @@ jobs:
         example:
           - demo-2024
           - demo-no-top-board
+          - i2c-scan
 
     steps:
       - uses: actions/checkout@v5
