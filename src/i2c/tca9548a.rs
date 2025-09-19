@@ -1,9 +1,10 @@
 use core::marker::ConstParamTy;
+use defmt::{Format, debug};
 use embedded_hal_async::i2c::{ErrorType, I2c, Operation};
 
 use super::SharedI2cBus;
 
-#[derive(ConstParamTy, PartialEq, Eq)]
+#[derive(Format, ConstParamTy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum BusNumber {
     Bus0 = 0b00000001,
@@ -45,6 +46,7 @@ where
     async fn read(&mut self, address: u8, read: &mut [u8]) -> Result<(), Self::Error> {
         let mut bus = self.parent_bus.lock().await;
         bus.write(self.mux_address, &[N as u8]).await?;
+        debug!("Selected {}", N);
         bus.read(address, read).await
     }
 
@@ -52,6 +54,7 @@ where
     async fn write(&mut self, address: u8, write: &[u8]) -> Result<(), Self::Error> {
         let mut bus = self.parent_bus.lock().await;
         bus.write(self.mux_address, &[N as u8]).await?;
+        debug!("Selected {}", N);
         bus.write(address, write).await
     }
 
@@ -64,6 +67,7 @@ where
     ) -> Result<(), Self::Error> {
         let mut bus = self.parent_bus.lock().await;
         bus.write(self.mux_address, &[N as u8]).await?;
+        debug!("Selected {}", N);
         bus.write_read(address, write, read).await
     }
 
@@ -75,6 +79,7 @@ where
     ) -> Result<(), Self::Error> {
         let mut bus = self.parent_bus.lock().await;
         bus.write(self.mux_address, &[N as u8]).await?;
+        debug!("Selected {}", N);
         bus.transaction(address, operations).await
     }
 }

@@ -22,6 +22,7 @@ fn pin_bits(pin: u8) -> u8 {
     }
 }
 
+#[derive(Format)]
 pub(crate) struct TypeErasedPin {
     address: u8,
     port: Port,
