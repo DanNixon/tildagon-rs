@@ -3,6 +3,7 @@
 
 pub mod hexpansion_slots;
 pub mod i2c;
+pub mod imu;
 pub mod pins;
 pub mod resources;
 pub mod system;
