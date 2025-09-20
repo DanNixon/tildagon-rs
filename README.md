@@ -10,10 +10,13 @@ Still quite early in development and things might change a bit, but very usable 
 
 - [x] "Low speed" IO driver
 - [x] Hexpansion ports
-- [x] LEDs
-- [x] Buttons
-- [x] Display
+- [x] 2024 top board
+   - [x] LEDs
+   - [x] Buttons
+   - [x] Display
+- [x] IMU
 - [ ] Power management
+- [ ] Hexpansion metadata read(/write)
 - [ ] Some form of dynamic hexpansion slot use
 
 ## Cargo features

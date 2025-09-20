@@ -22,6 +22,7 @@ embedded-hal-async = "1.0.0"
 embedded-hal-bus = { version = "0.3.0", default-features = false, features = ["async", "defmt-03"] }
 esp-hal = { version = "=1.0.0-beta.1", features = ["defmt", "esp32s3", "unstable"] }
 esp-hal-smartled = { version = "0.15.0", features = ["defmt", "esp32s3"] }
+fixedvec = "0.2.4"
 getset = "0.1.6"
 heapless = { version = "0.8.0", features = ["defmt-03"] }
 mipidsi = { version = "0.9.0", default-features = false }

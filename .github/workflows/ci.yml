@@ -52,6 +52,7 @@ jobs:
           - demo-2024
           - demo-no-top-board
           - i2c-scan
+          - imu-2024
 
     steps:
       - uses: actions/checkout@v5
