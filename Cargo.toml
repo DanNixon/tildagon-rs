@@ -4,7 +4,7 @@ description = "Board support crate for the Electromagnetic Field Tildagon badge"
 license-file = "LICENSE"
 homepage = "https://github.com/DanNixon/tildagon-rs"
 repository = "https://github.com/DanNixon/tildagon-rs"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2024"
 
 [features]
