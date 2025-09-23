@@ -335,25 +335,24 @@ async fn button_logic_task() {
         match event_sub.next_message().await {
             WaitResult::Lagged(_) => panic!(),
             WaitResult::Message(Event::Button(event)) => {
-                if event.released() {
-                    if let Some(short_press) = event.duration().map(|d| d < Duration::from_secs(1))
-                    {
-                        let slot = match event.button() {
-                            Button::A => HexpansionSlot::A,
-                            Button::B => HexpansionSlot::B,
-                            Button::C => HexpansionSlot::C,
-                            Button::D => HexpansionSlot::D,
-                            Button::E => HexpansionSlot::E,
-                            Button::F => HexpansionSlot::F,
-                        };
+                if event.released()
+                    && let Some(short_press) = event.duration().map(|d| d < Duration::from_secs(1))
+                {
+                    let slot = match event.button() {
+                        Button::A => HexpansionSlot::A,
+                        Button::B => HexpansionSlot::B,
+                        Button::C => HexpansionSlot::C,
+                        Button::D => HexpansionSlot::D,
+                        Button::E => HexpansionSlot::E,
+                        Button::F => HexpansionSlot::F,
+                    };
 
-                        let msg = HexpansionControlMsg {
-                            slot,
-                            enable: short_press,
-                        };
+                    let msg = HexpansionControlMsg {
+                        slot,
+                        enable: short_press,
+                    };
 
-                        hex_control_pub.publish(msg).await;
-                    }
+                    hex_control_pub.publish(msg).await;
                 }
             }
             WaitResult::Message(_) => {}
