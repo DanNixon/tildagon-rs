@@ -40,4 +40,4 @@ Initial setup:
 To activate development environment:
 
 - `distrobox enter`
-- `. ./.export-esp.sh`
+- `. $HOME/export-esp.sh`

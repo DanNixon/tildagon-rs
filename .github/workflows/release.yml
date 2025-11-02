@@ -42,7 +42,7 @@ jobs:
       - name: Run release-plz
         shell: devenv shell bash -- -e {0}
         run: |
-          source ./.export-esp.sh
+          source "$HOME/export-esp.sh"
           release-plz release --forge=github
         env:
           GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -80,7 +80,7 @@ jobs:
       - name: Run release-plz
         shell: devenv shell bash -- -e {0}
         run: |
-          source ./.export-esp.sh
+          source "$HOME/export-esp.sh"
           release-plz release-pr --forge=github
         env:
           GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}

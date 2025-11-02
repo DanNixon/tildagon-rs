@@ -30,13 +30,13 @@ jobs:
       - name: Formatting
         shell: devenv shell bash -- -e {0}
         run: |
-          source ./.export-esp.sh
+          source "$HOME/export-esp.sh"
           treefmt --fail-on-change
 
       - name: Clippy
         shell: devenv shell bash -- -e {0}
         run: |
-          source ./.export-esp.sh
+          source "$HOME/export-esp.sh"
           cargo clippy --release -F top-board-none -- -D warnings
           cargo clippy --release -F top-board-2024 -- -D warnings
 
@@ -70,13 +70,13 @@ jobs:
       - name: Clippy
         shell: devenv shell bash -- -e {0}
         run: |
-          source ./.export-esp.sh
+          source "$HOME/export-esp.sh"
           cd ./examples/${{ matrix.example }}
           cargo clippy --release -- -D warnings
 
       - name: Build
         shell: devenv shell bash -- -e {0}
         run: |
-          source ./.export-esp.sh
+          source "$HOME/export-esp.sh"
           cd ./examples/${{ matrix.example }}
           cargo build --release

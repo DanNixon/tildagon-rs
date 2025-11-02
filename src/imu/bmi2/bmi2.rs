@@ -761,7 +761,7 @@ where
         // Offset and burst calculation
         let mut offset = 0u16;
         let max_len = config_file.len() as u16;
-        let burst = if self.max_burst % 2 == 0 {
+        let burst = if self.max_burst.is_multiple_of(2) {
             self.max_burst - 1 // Address byte + even number of data bytes
         } else {
             self.max_burst - 2 // Make sure we have even data bytes
