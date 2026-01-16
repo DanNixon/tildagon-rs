@@ -1,3 +1,11 @@
+[formatter.typos]
+command = "typos"
+options = ["--write-changes", "--force-exclude"]
+includes = ["*"]
+excludes = [
+  "src/imu/bmi2/types.rs",
+]
+
 [formatter.markdown]
 command = "mdl"
 includes = [ "*.md" ]

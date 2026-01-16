@@ -239,7 +239,7 @@ pub struct InterruptStatus {
     pub wrist_gesture_out: bool,
     /// No motion detection output.
     pub no_motion_out: bool,
-    /// Any motion detecion output.
+    /// Any motion detection output.
     pub any_motion_out: bool,
     /// FIFO full interrupt.
     pub ffull_int: bool,
@@ -303,7 +303,7 @@ pub enum WristGesture {
 #[derive(Format)]
 #[repr(u8)]
 pub enum Activity {
-    /// User stationnary.
+    /// User stationary.
     Still = 0x00,
     /// User walking.
     Walking = 0x01,
@@ -361,7 +361,7 @@ pub enum Message {
     InitOk = 0x01,
     /// initialization error.
     InitErr = 0x02,
-    /// Ivalid driver.
+    /// Invalid driver.
     DrvErr = 0x03,
     /// Sensor stopped.
     SnsErr = 0x04,
@@ -956,9 +956,9 @@ pub enum ReadBurst {
 
 /// Auxiliary sensor configuration..
 pub struct AuxIfConf {
-    /// Burst data lenngth.
+    /// Burst data length.
     pub aux_read_burst: ReadBurst,
-    /// Manual burst data lenngth.
+    /// Manual burst data length.
     pub man_read_burst: ReadBurst,
     /// Enables FCU write command.
     pub aux_fcu_write_en: bool,
@@ -1264,7 +1264,7 @@ impl InternalErrorMask {
 pub struct InternalError {
     /// Long processing time, processing halted.
     pub int_err_1: bool,
-    /// Fatal error, procesing halted.
+    /// Fatal error, processing halted.
     pub int_err_2: bool,
     /// Feature engine has been disabled by host during sensor operation.
     pub feat_eng_dis: bool,
