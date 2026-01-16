@@ -2,6 +2,15 @@ version: 2
 
 updates:
   - package-ecosystem: github-actions
-    directory: "./"
+    directory: "."
     schedule:
-      interval: "monthly"
+      interval: quarterly
+
+  - package-ecosystem: cargo
+    directory: "."
+    schedule:
+      interval: quarterly
+    groups:
+      cargo-dependencies:
+        patterns:
+          - "*"
