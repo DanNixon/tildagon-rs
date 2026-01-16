@@ -19,6 +19,7 @@
         alejandra
         mdl
         rustfmt
+        typos
 
         # Release tools
         release-plz
