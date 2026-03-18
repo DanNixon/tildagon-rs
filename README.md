@@ -28,7 +28,7 @@ You will need to enable exactly one `top-board-*` feature.
 
 ## Development setup
 
-Assumes using [devenv](https://devenv.sh/) and [Distrobox](https://distrobox.it/).
+Assumes using Nix dev shell and [Distrobox](https://distrobox.it/).
 If you are using a "normal" Linux distro, you can probably skip the Distrobox steps (this was the easiest option on NixOS).
 
 Initial setup:
