@@ -25,15 +25,11 @@ pub struct Burst {
     kind: BurstKind,
 }
 
+#[derive(Default)]
 enum BurstKind {
+    #[default]
     Max,
     Other(u16),
-}
-
-impl Default for BurstKind {
-    fn default() -> Self {
-        Self::Max
-    }
 }
 
 impl Burst {
