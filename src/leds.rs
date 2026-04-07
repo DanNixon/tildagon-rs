@@ -5,20 +5,29 @@ use defmt::Format;
 use embedded_hal::digital::{ErrorKind, PinState};
 use esp_hal::{
     Blocking,
-    rmt::{Channel, ChannelCreator},
+    rmt::{ChannelCreator, PulseCode},
 };
-use esp_hal_smartled::{LedAdapterError, SmartLedsAdapter, buffer_size_async};
+use esp_hal_smartled::{LedAdapterError, SmartLedsAdapter, buffer_size, smart_led_buffer};
 use smart_leds::{RGB8, SmartLedsWrite, brightness, gamma};
 
-pub struct Leds<I2C> {
+const RMT_BUFFER_SIZE: usize = buffer_size(LED_COUNT);
+
+pub type RmtBuffer = [PulseCode; RMT_BUFFER_SIZE];
+
+pub fn make_rmt_buffer() -> RmtBuffer {
+    smart_led_buffer!(LED_COUNT)
+}
+
+pub struct Leds<'ch, I2C> {
     led_power: crate::pins::OutputPin<I2C>,
-    leds: SmartLedsAdapter<Channel<Blocking, 0>, { LED_COUNT * 25 }>,
+
+    leds: SmartLedsAdapter<'ch, RMT_BUFFER_SIZE>,
 
     pub intensity: u8,
     pub pixels: [RGB8; LED_COUNT],
 }
 
-impl<I2C, E> Leds<I2C>
+impl<'ch, I2C, E> Leds<'ch, I2C>
 where
     I2C: embedded_hal_async::i2c::I2c<Error = E>,
 {
@@ -26,10 +35,10 @@ where
         i2c: I2C,
         pins: LedPins,
         r: LedResources<'static>,
-        rmt_ch: ChannelCreator<Blocking, 0>,
+        rmt_ch: ChannelCreator<'static, Blocking, 0>,
+        rmt_buffer: &'ch mut [PulseCode; RMT_BUFFER_SIZE],
     ) -> Result<Self, E> {
-        let buffer = [0_u32; buffer_size_async(LED_COUNT)];
-        let leds = SmartLedsAdapter::new(rmt_ch, r.data, buffer);
+        let leds = SmartLedsAdapter::new(rmt_ch, r.data, rmt_buffer);
 
         Ok(Self {
             led_power: pins.power_enable.into_output(i2c).await?,

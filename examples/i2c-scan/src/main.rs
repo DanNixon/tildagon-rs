@@ -12,7 +12,7 @@ use embassy_time::{Duration, Ticker};
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
-    esp_hal::{self, clock::CpuClock, timer::systimer::SystemTimer},
+    esp_hal::{self, clock::CpuClock, timer::timg::TimerGroup},
     i2c::{
         HexpansionAI2cBus, HexpansionBI2cBus, HexpansionCI2cBus, HexpansionDI2cBus,
         HexpansionEI2cBus, HexpansionFI2cBus, SharedI2cBus, SystemI2cBus, TopBoardI2cBus,
@@ -35,7 +35,7 @@ macro_rules! scan_and_report {
     };
 }
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(_spawner: Spawner) {
     rtt_target::rtt_init_defmt!();
 
@@ -47,8 +47,8 @@ async fn main(_spawner: Spawner) {
     // COEX needs more RAM - so we've added some more
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
 
-    let timer0 = SystemTimer::new(p.SYSTIMER);
-    esp_hal_embassy::init(timer0.alarm0);
+    let timg0 = TimerGroup::new(p.TIMG0);
+    esp_rtos::start(timg0.timer0);
 
     static I2C_BUS: StaticCell<SharedI2cBus<tildagon::i2c::I2c>> = StaticCell::new();
     let (bus, _reset) = tildagon::i2c::i2c_bus(r.i2c).await;

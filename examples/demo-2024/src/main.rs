@@ -6,7 +6,6 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use core::ptr::addr_of_mut;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_futures::select::{Either, select};
@@ -28,7 +27,7 @@ use embedded_text::{
     alignment::{HorizontalAlignment, VerticalAlignment},
     style::TextBoxStyleBuilder,
 };
-use esp_hal_embassy::Executor;
+use esp_rtos::embassy::Executor;
 use panic_rtt_target as _;
 use smart_leds::{
     RGB8,
@@ -38,12 +37,8 @@ use static_cell::StaticCell;
 use tildagon::{
     buttons::{Button, ButtonEvent, ButtonState, Buttons},
     esp_hal::{
-        self,
-        clock::CpuClock,
-        rmt::Rmt,
-        system::{CpuControl, Stack},
-        time::Rate,
-        timer::systimer::SystemTimer,
+        self, clock::CpuClock, interrupt::software::SoftwareInterruptControl, rmt::Rmt,
+        system::Stack, time::Rate, timer::timg::TimerGroup,
     },
     hexpansion_slots::{
         HexpansionSlot, HexpansionSlotControl, HexpansionSlotEvent, HexpansionState,
@@ -60,9 +55,7 @@ extern crate alloc;
 // For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
 esp_bootloader_esp_idf::esp_app_desc!();
 
-static mut APP_CORE_STACK: Stack<8192> = Stack::new();
-
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
     rtt_target::rtt_init_defmt!();
 
@@ -74,8 +67,8 @@ async fn main(spawner: Spawner) {
     // COEX needs more RAM - so we've added some more
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
 
-    let timer0 = SystemTimer::new(p.SYSTIMER);
-    esp_hal_embassy::init(timer0.alarm0);
+    let timg0 = TimerGroup::new(p.TIMG0);
+    esp_rtos::start(timg0.timer0);
 
     static I2C_BUS: StaticCell<SharedI2cBus<tildagon::i2c::I2c>> = StaticCell::new();
     let (bus, _reset) = tildagon::i2c::i2c_bus(r.i2c).await;
@@ -108,26 +101,37 @@ async fn main(spawner: Spawner) {
 
     let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
+    static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
+    let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
+
     let mut leds = Leds::try_new(
         SharedI2cDevice::new(i2c_system),
         pins.led,
         r.led,
         rmt.channel0,
+        rmt_buffer,
     )
     .await
     .unwrap();
     leds.set_power(true).await.unwrap();
 
-    let mut cpu_control = CpuControl::new(p.CPU_CTRL);
-    let _guard = cpu_control
-        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
+    static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
+    let app_core_stack = APP_CORE_STACK.init(Stack::new());
+
+    let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+    esp_rtos::start_second_core(
+        p.CPU_CTRL,
+        sw_int.software_interrupt0,
+        sw_int.software_interrupt1,
+        app_core_stack,
+        move || {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
                 spawner.must_spawn(display_task(r.top_board, r.display));
             });
-        })
-        .unwrap();
+        },
+    );
 
     spawner.must_spawn(led_task(leds));
     spawner.must_spawn(button_logic_task());
@@ -282,7 +286,7 @@ async fn display_task(top_board: TopBoardResources<'static>, display: DisplayRes
 }
 
 #[embassy_executor::task]
-async fn led_task(mut leds: Leds<SharedI2cDevice<SystemI2cBus>>) {
+async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
     const HEX_DISABLED_COLOUR: RGB8 = RGB8::new(255, 0, 0);
     const HEX_EMPTY_COLOUR: RGB8 = RGB8::new(255, 192, 0);
     const HEX_OCCUPIED_COLOUR: RGB8 = RGB8::new(255, 255, 255);
