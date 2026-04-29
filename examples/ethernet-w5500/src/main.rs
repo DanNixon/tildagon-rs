@@ -37,8 +37,19 @@ use static_cell::StaticCell;
 use tildagon::{
     buttons::{Button, ButtonEvent, ButtonState, Buttons},
     esp_hal::{
-        self, clock::CpuClock, interrupt::software::SoftwareInterruptControl, rmt::Rmt,
-        system::Stack, time::Rate, timer::timg::TimerGroup,
+        self,
+        clock::CpuClock,
+        dma::{DmaRxBuf, DmaTxBuf},
+        dma_buffers,
+        interrupt::software::SoftwareInterruptControl,
+        rmt::Rmt,
+        spi::{
+            Mode,
+            master::{Config, Spi},
+        },
+        system::Stack,
+        time::Rate,
+        timer::timg::TimerGroup,
     },
     hexpansion_slots::{
         HexpansionSlot, HexpansionSlotControl, HexpansionSlotEvent, HexpansionState,
@@ -141,31 +152,61 @@ async fn main(spawner: Spawner) {
     // Use channels to indicate readiness properly, mkay.
     Timer::after_millis(500).await;
 
-    let mut tick = Ticker::every(Duration::from_millis(100));
-    let mut hex_control_sub = HEX_CONTROL_CHANNEL.subscriber().unwrap();
-    let event_pub = EVENT_CHANNEL.publisher().unwrap();
+    static I2C_HEX_A: StaticCell<SharedI2cBus<tildagon::i2c::HexpansionAI2cBus>> =
+        StaticCell::new();
+    let i2c_hex_a = I2C_HEX_A.init(tildagon::i2c::hexpansion_a_i2c_bus(i2c_bus));
 
-    loop {
-        match select(tick.next(), hex_control_sub.next_message()).await {
-            Either::First(_) => {
-                let regs = pin_control.read_input_registers().await.unwrap();
+    let hex_a_fast = r.hexpansion_a;
+    let hex_a_slow = pins.hexpansion_a;
 
-                for event in buttons.update(&regs) {
-                    info!("Button event: {}", event);
-                    event_pub.publish(Event::Button(event)).await;
-                }
+    let dma_channel = p.DMA_CH0;
 
-                for event in hex_slots.update(&regs) {
-                    info!("Hexpansion event: {}", event);
-                    event_pub.publish(Event::HexpansionSlot(event)).await;
-                }
-            }
-            Either::Second(WaitResult::Lagged(_)) => panic!(),
-            Either::Second(WaitResult::Message(msg)) => {
-                hex_slots.set_enabled(msg.slot, msg.enable).await.unwrap();
-            }
-        }
-    }
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+    let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+    let cs = hex_a_slow.ls_1.into_output(i2c_hex_a).await.unwrap();
+
+    let mut spi = Spi::new(
+        p.SPI2,
+        Config::default()
+            .with_frequency(Rate::from_mhz(50))
+            .with_mode(Mode::_0),
+    )
+    .unwrap()
+    .with_sck(hex_a_fast.hs_1)
+    .with_mosi(hex_a_fast.hs_2)
+    .with_miso(hex_a_fast.hs_3)
+    .with_cs(cs)
+    .with_dma(dma_channel)
+    .with_buffers(dma_rx_buf, dma_tx_buf)
+    .into_async();
+
+    // let mut tick = Ticker::every(Duration::from_millis(100));
+    // let mut hex_control_sub = HEX_CONTROL_CHANNEL.subscriber().unwrap();
+    // let event_pub = EVENT_CHANNEL.publisher().unwrap();
+
+    // loop {
+    //     match select(tick.next(), hex_control_sub.next_message()).await {
+    //         Either::First(_) => {
+    //             let regs = pin_control.read_input_registers().await.unwrap();
+
+    //             for event in buttons.update(&regs) {
+    //                 info!("Button event: {}", event);
+    //                 event_pub.publish(Event::Button(event)).await;
+    //             }
+
+    //             for event in hex_slots.update(&regs) {
+    //                 info!("Hexpansion event: {}", event);
+    //                 event_pub.publish(Event::HexpansionSlot(event)).await;
+    //             }
+    //         }
+    //         Either::Second(WaitResult::Lagged(_)) => panic!(),
+    //         Either::Second(WaitResult::Message(msg)) => {
+    //             hex_slots.set_enabled(msg.slot, msg.enable).await.unwrap();
+    //         }
+    //     }
+    // }
 }
 
 #[derive(Clone)]
