@@ -25,7 +25,7 @@
         release-plz
       ];
 
-      DBX_CONTAINER_IMAGE = "ubuntu:24.04";
+      DBX_CONTAINER_IMAGE = "ubuntu:26.04";
       DBX_CONTAINER_NAME = "tildagon-rs-build-environment";
     };
   };
