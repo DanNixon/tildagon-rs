@@ -43,6 +43,7 @@ jobs:
         example:
           - demo-2024
           - demo-no-top-board
+          - ethernet-w5500
           - i2c-scan
           - imu-2024
 
