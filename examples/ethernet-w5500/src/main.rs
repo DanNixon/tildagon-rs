@@ -145,7 +145,6 @@ async fn main(spawner: Spawner) {
     );
 
     spawner.must_spawn(led_task(leds));
-    spawner.must_spawn(button_logic_task());
 
     // A little time for other tasks to start.
     // Hacky as all fuck but good enough for a demo.
@@ -159,16 +158,18 @@ async fn main(spawner: Spawner) {
     let hex_a_fast = r.hexpansion_a;
     let hex_a_slow = pins.hexpansion_a;
 
-    let dma_channel = p.DMA_CH0;
+    let dma_channel = p.DMA_CH1;
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let cs = hex_a_slow.ls_1.into_output(i2c_hex_a).await.unwrap();
+    let dev = SharedI2cDevice::new(i2c_hex_a);
+    let mut cs = hex_a_slow.ls_1.into_output(dev).await.unwrap();
+    cs.set_high().await.unwrap();
 
     let mut spi = Spi::new(
-        p.SPI2,
+        p.SPI3,
         Config::default()
             .with_frequency(Rate::from_mhz(50))
             .with_mode(Mode::_0),
@@ -177,55 +178,17 @@ async fn main(spawner: Spawner) {
     .with_sck(hex_a_fast.hs_1)
     .with_mosi(hex_a_fast.hs_2)
     .with_miso(hex_a_fast.hs_3)
-    .with_cs(cs)
     .with_dma(dma_channel)
     .with_buffers(dma_rx_buf, dma_tx_buf)
     .into_async();
 
-    // let mut tick = Ticker::every(Duration::from_millis(100));
-    // let mut hex_control_sub = HEX_CONTROL_CHANNEL.subscriber().unwrap();
-    // let event_pub = EVENT_CHANNEL.publisher().unwrap();
+    let mut tick = Ticker::every(Duration::from_secs(60));
 
-    // loop {
-    //     match select(tick.next(), hex_control_sub.next_message()).await {
-    //         Either::First(_) => {
-    //             let regs = pin_control.read_input_registers().await.unwrap();
-
-    //             for event in buttons.update(&regs) {
-    //                 info!("Button event: {}", event);
-    //                 event_pub.publish(Event::Button(event)).await;
-    //             }
-
-    //             for event in hex_slots.update(&regs) {
-    //                 info!("Hexpansion event: {}", event);
-    //                 event_pub.publish(Event::HexpansionSlot(event)).await;
-    //             }
-    //         }
-    //         Either::Second(WaitResult::Lagged(_)) => panic!(),
-    //         Either::Second(WaitResult::Message(msg)) => {
-    //             hex_slots.set_enabled(msg.slot, msg.enable).await.unwrap();
-    //         }
-    //     }
-    // }
+    loop {
+        // TODO
+        tick.next().await;
+    }
 }
-
-#[derive(Clone)]
-enum Event {
-    Button(ButtonEvent),
-    HexpansionSlot(HexpansionSlotEvent),
-}
-
-static EVENT_CHANNEL: PubSubChannel<CriticalSectionRawMutex, Event, 12, 4, 4> =
-    PubSubChannel::new();
-
-#[derive(Clone)]
-struct HexpansionControlMsg {
-    slot: HexpansionSlot,
-    enable: bool,
-}
-
-static HEX_CONTROL_CHANNEL: PubSubChannel<CriticalSectionRawMutex, HexpansionControlMsg, 6, 1, 1> =
-    PubSubChannel::new();
 
 #[embassy_executor::task]
 async fn display_task(top_board: TopBoardResources<'static>, display: DisplayResources<'static>) {
@@ -233,19 +196,9 @@ async fn display_task(top_board: TopBoardResources<'static>, display: DisplayRes
     let mut display = tildagon::display::init(top_board, display, &mut display_buffer);
     display.clear(Rgb565::BLACK).unwrap();
 
-    let mut event_sub = EVENT_CHANNEL.subscriber().unwrap();
-
     let character_style = MonoTextStyleBuilder::new()
         .font(&FONT_10X20)
         .text_color(Rgb565::WHITE)
-        .build();
-    let character_style_red = MonoTextStyleBuilder::new()
-        .font(&FONT_10X20)
-        .text_color(Rgb565::RED)
-        .build();
-    let character_style_orange = MonoTextStyleBuilder::new()
-        .font(&FONT_10X20)
-        .text_color(Rgb565::YELLOW)
         .build();
 
     let textbox_style = TextBoxStyleBuilder::new()
@@ -256,82 +209,14 @@ async fn display_task(top_board: TopBoardResources<'static>, display: DisplayRes
     let centre = display.bounding_box().center();
     let width = display.bounding_box().size.width;
 
-    TextBox::with_textbox_style(
-        "Buttons",
-        Rectangle::with_center(centre - Point::new(0, 80), Size::new(width, 50)),
-        character_style,
-        textbox_style,
-    )
-    .draw(&mut display)
-    .unwrap();
-
-    TextBox::with_textbox_style(
-        "Hexpansions",
-        Rectangle::with_center(centre + Point::new(0, 80), Size::new(width, 50)),
-        character_style,
-        textbox_style,
-    )
-    .draw(&mut display)
-    .unwrap();
-
     loop {
-        match event_sub.next_message().await {
-            WaitResult::Lagged(_) => panic!(),
-            WaitResult::Message(Event::Button(event)) => {
-                let (text, x) = match event.button() {
-                    Button::A => ("A", -50),
-                    Button::B => ("B", -30),
-                    Button::C => ("C", -10),
-                    Button::D => ("D", 10),
-                    Button::E => ("E", 30),
-                    Button::F => ("F", 50),
-                };
-
-                TextBox::with_textbox_style(
-                    text,
-                    Rectangle::with_center(centre + Point::new(x, -60), Size::new(width, 50)),
-                    match event.now().state() {
-                        ButtonState::Pressed => character_style_orange,
-                        ButtonState::Released => character_style,
-                    },
-                    textbox_style,
-                )
-                .draw(&mut display)
-                .unwrap();
-            }
-            WaitResult::Message(Event::HexpansionSlot(event)) => {
-                let (text, x) = match event.slot() {
-                    HexpansionSlot::A => ("A", -50),
-                    HexpansionSlot::B => ("B", -30),
-                    HexpansionSlot::C => ("C", -10),
-                    HexpansionSlot::D => ("D", 10),
-                    HexpansionSlot::E => ("E", 30),
-                    HexpansionSlot::F => ("F", 50),
-                };
-
-                TextBox::with_textbox_style(
-                    text,
-                    Rectangle::with_center(centre + Point::new(x, 60), Size::new(width, 50)),
-                    match event.state() {
-                        HexpansionState::Disabled => character_style_red,
-                        HexpansionState::Empty => character_style_orange,
-                        HexpansionState::Occupied => character_style,
-                    },
-                    textbox_style,
-                )
-                .draw(&mut display)
-                .unwrap();
-            }
-        }
+        // TODO
+        Timer::after_secs(30).await;
     }
 }
 
 #[embassy_executor::task]
 async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
-    const HEX_DISABLED_COLOUR: RGB8 = RGB8::new(255, 0, 0);
-    const HEX_EMPTY_COLOUR: RGB8 = RGB8::new(255, 192, 0);
-    const HEX_OCCUPIED_COLOUR: RGB8 = RGB8::new(255, 255, 255);
-
     *leds.main_board_pixel() = RGB8::new(128, 0, 128);
 
     leds.write().unwrap();
@@ -342,65 +227,8 @@ async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
         val: 127,
     };
 
-    let mut front_pixel_tick = Ticker::every(Duration::from_millis(50));
-    let mut event_sub = EVENT_CHANNEL.subscriber().unwrap();
-
     loop {
-        match select(event_sub.next_message(), front_pixel_tick.next()).await {
-            Either::First(WaitResult::Lagged(_)) => panic!(),
-            Either::First(WaitResult::Message(Event::HexpansionSlot(event))) => {
-                *leds.hexpansion_pixel(*event.slot()) = match *event.state() {
-                    HexpansionState::Disabled => HEX_DISABLED_COLOUR,
-                    HexpansionState::Empty => HEX_EMPTY_COLOUR,
-                    HexpansionState::Occupied => HEX_OCCUPIED_COLOUR,
-                };
-
-                leds.write().unwrap();
-            }
-            Either::First(_) => {}
-            Either::Second(_) => {
-                colour.hue = colour.hue.wrapping_add(2);
-
-                leds.front_pixels()
-                    .iter_mut()
-                    .for_each(|d| *d = hsv2rgb(colour));
-
-                leds.write().unwrap();
-            }
-        }
-    }
-}
-
-#[embassy_executor::task]
-async fn button_logic_task() {
-    let mut event_sub = EVENT_CHANNEL.subscriber().unwrap();
-    let hex_control_pub = HEX_CONTROL_CHANNEL.publisher().unwrap();
-
-    loop {
-        match event_sub.next_message().await {
-            WaitResult::Lagged(_) => panic!(),
-            WaitResult::Message(Event::Button(event)) => {
-                if event.released()
-                    && let Some(short_press) = event.duration().map(|d| d < Duration::from_secs(1))
-                {
-                    let slot = match event.button() {
-                        Button::A => HexpansionSlot::A,
-                        Button::B => HexpansionSlot::B,
-                        Button::C => HexpansionSlot::C,
-                        Button::D => HexpansionSlot::D,
-                        Button::E => HexpansionSlot::E,
-                        Button::F => HexpansionSlot::F,
-                    };
-
-                    let msg = HexpansionControlMsg {
-                        slot,
-                        enable: short_press,
-                    };
-
-                    hex_control_pub.publish(msg).await;
-                }
-            }
-            WaitResult::Message(_) => {}
-        }
+        // TODO
+        Timer::after_secs(30).await;
     }
 }

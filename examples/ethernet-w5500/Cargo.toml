@@ -1,7 +1,12 @@
 [package]
-name = "tildagon-demo-2024"
+name = "tildagon-ethernet-w5500"
 version = "0.1.0"
 edition = "2024"
+
+[[bin]]
+name = "tildagon-ethernet-w5500"
+test = false
+bench = false
 
 [dependencies]
 critical-section = "1.2.0"

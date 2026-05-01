@@ -3,6 +3,11 @@ name = "tildagon-demo-2024"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "tildagon-demo-2024"
+test = false
+bench = false
+
 [dependencies]
 critical-section = "1.2.0"
 defmt = "1.0.1"
