@@ -156,10 +156,6 @@ async fn main(spawner: Spawner) {
         .await
         .unwrap();
 
-    static I2C_HEX_A: StaticCell<SharedI2cBus<tildagon::i2c::HexpansionAI2cBus>> =
-        StaticCell::new();
-    let i2c_hex_a = I2C_HEX_A.init(tildagon::i2c::hexpansion_a_i2c_bus(i2c_bus));
-
     let hex_a_fast = r.hexpansion_a;
     let hex_a_slow = pins.hexpansion_a;
 
@@ -171,7 +167,7 @@ async fn main(spawner: Spawner) {
 
     let mut cs = hex_a_slow
         .ls_1
-        .into_output(SharedI2cDevice::new(i2c_hex_a))
+        .into_output(SharedI2cDevice::new(i2c_system))
         .await
         .unwrap();
     cs.set_high().await.unwrap();
