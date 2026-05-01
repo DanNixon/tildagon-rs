@@ -189,7 +189,9 @@ async fn main(spawner: Spawner) {
         .await
         .unwrap();
 
-    // TODO
+    // TODO: just mock the reset pin and assert it manually before creating the device
+    let (device, runner) =
+        embassy_net_wiznet::new(mac_addr, state, spi_dev, w5500_int, w5500_reset).unwrap();
 
     let mut tick = Ticker::every(Duration::from_secs(60));
 
