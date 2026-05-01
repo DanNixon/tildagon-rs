@@ -7,6 +7,11 @@ repository = "https://github.com/DanNixon/tildagon-rs"
 version = "0.0.5"
 edition = "2024"
 
+[lib]
+path = "src/lib.rs"
+test = false
+bench = false
+
 [features]
 top-board-none = []
 top-board-2024 = []
