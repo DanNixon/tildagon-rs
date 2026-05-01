@@ -8,6 +8,8 @@
 
 use defmt::info;
 use embassy_executor::Spawner;
+use embassy_net::StackResources;
+use embassy_net_wiznet::{Runner, chip::W5500};
 use embassy_time::{Duration, Ticker, Timer};
 use embedded_graphics::{
     Drawable,
@@ -39,6 +41,7 @@ use tildagon::{
         gpio::Input,
         interrupt::software::SoftwareInterruptControl,
         rmt::Rmt,
+        rng::Rng,
         spi::{
             Mode,
             master::{Config, Spi},
@@ -190,8 +193,35 @@ async fn main(spawner: Spawner) {
         .unwrap();
 
     // TODO: just mock the reset pin and assert it manually before creating the device
+    let mac_addr = [0x02, 0x00, 0x00, 0x00, 0x00, 0x00];
+    static STATE: StaticCell<State<8, 8>> = StaticCell::new();
+    let state = STATE.init(State::<8, 8>::new());
     let (device, runner) =
         embassy_net_wiznet::new(mac_addr, state, spi_dev, w5500_int, w5500_reset).unwrap();
+    spawner.spawn(unwrap!(ethernet_task(runner)));
+
+    // Generate random seed
+    let rng = Rng::new();
+    let seed = rng.random() as u64;
+
+    // Init network stack
+    static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
+    let (stack, runner) = embassy_net::new(
+        device,
+        embassy_net::Config::dhcpv4(Default::default()),
+        RESOURCES.init(StackResources::new()),
+        seed,
+    );
+
+    // Launch network task
+    spawner.spawn(unwrap!(net_task(runner)));
+
+    info!("Waiting for DHCP...");
+    stack.wait_link_up().await;
+    stack.wait_config_up().await;
+    let cfg = stack.config_v4().unwrap();
+    let local_addr = cfg.address.address();
+    info!("IP address: {:?}", local_addr);
 
     let mut tick = Ticker::every(Duration::from_secs(60));
 
@@ -199,6 +229,24 @@ async fn main(spawner: Spawner) {
         // TODO
         tick.next().await;
     }
+}
+
+#[embassy_executor::task]
+async fn ethernet_task(
+    runner: Runner<
+        'static,
+        W5500,
+        ExclusiveDevice<Spi<'static, SPI0, Async>, Output<'static>, Delay>,
+        Input<'static>,
+        Output<'static>,
+    >,
+) -> ! {
+    runner.run().await
+}
+
+#[embassy_executor::task]
+async fn net_task(mut runner: embassy_net::Runner<'static, Device<'static>>) -> ! {
+    runner.run().await
 }
 
 #[embassy_executor::task]
