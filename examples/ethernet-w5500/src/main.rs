@@ -151,6 +151,11 @@ async fn main(spawner: Spawner) {
     // Use channels to indicate readiness properly, mkay.
     Timer::after_millis(500).await;
 
+    hex_slots
+        .set_enabled(HexpansionSlot::A, true)
+        .await
+        .unwrap();
+
     static I2C_HEX_A: StaticCell<SharedI2cBus<tildagon::i2c::HexpansionAI2cBus>> =
         StaticCell::new();
     let i2c_hex_a = I2C_HEX_A.init(tildagon::i2c::hexpansion_a_i2c_bus(i2c_bus));
@@ -164,8 +169,11 @@ async fn main(spawner: Spawner) {
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let dev = SharedI2cDevice::new(i2c_hex_a);
-    let mut cs = hex_a_slow.ls_1.into_output(dev).await.unwrap();
+    let mut cs = hex_a_slow
+        .ls_1
+        .into_output(SharedI2cDevice::new(i2c_hex_a))
+        .await
+        .unwrap();
     cs.set_high().await.unwrap();
 
     let mut spi = Spi::new(
