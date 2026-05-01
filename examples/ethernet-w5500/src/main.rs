@@ -8,11 +8,6 @@
 
 use defmt::info;
 use embassy_executor::Spawner;
-use embassy_futures::select::{Either, select};
-use embassy_sync::{
-    blocking_mutex::raw::CriticalSectionRawMutex,
-    pubsub::{PubSubChannel, WaitResult},
-};
 use embassy_time::{Duration, Ticker, Timer};
 use embedded_graphics::{
     Drawable,
@@ -35,12 +30,13 @@ use smart_leds::{
 };
 use static_cell::StaticCell;
 use tildagon::{
-    buttons::{Button, ButtonEvent, ButtonState, Buttons},
+    buttons::Buttons,
     esp_hal::{
         self,
         clock::CpuClock,
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
+        gpio::Input,
         interrupt::software::SoftwareInterruptControl,
         rmt::Rmt,
         spi::{
@@ -51,9 +47,7 @@ use tildagon::{
         time::Rate,
         timer::timg::TimerGroup,
     },
-    hexpansion_slots::{
-        HexpansionSlot, HexpansionSlotControl, HexpansionSlotEvent, HexpansionState,
-    },
+    hexpansion_slots::{HexpansionSlot, HexpansionSlotControl},
     i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
     leds::Leds,
     pins::{PinControl, async_digital::OutputPin},
@@ -165,12 +159,13 @@ async fn main(spawner: Spawner) {
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
+    // Keep chip select low so that W5500 is always enabled, it is the only device on the bus anyway
     let mut cs = hex_a_slow
         .ls_1
         .into_output(SharedI2cDevice::new(i2c_system))
         .await
         .unwrap();
-    cs.set_high().await.unwrap();
+    cs.set_low().await.unwrap();
 
     let mut spi = Spi::new(
         p.SPI3,
@@ -185,6 +180,16 @@ async fn main(spawner: Spawner) {
     .with_dma(dma_channel)
     .with_buffers(dma_rx_buf, dma_tx_buf)
     .into_async();
+
+    let w5500_int = Input::new(hex_a_fast.hs_4, Default::default());
+
+    let w5500_reset = hex_a_slow
+        .ls_2
+        .into_output(SharedI2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+
+    // TODO
 
     let mut tick = Ticker::every(Duration::from_secs(60));
 
