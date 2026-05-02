@@ -196,7 +196,7 @@ async fn main(spawner: Spawner) {
         p.SPI3,
         Config::default()
             .with_frequency(Rate::from_mhz(10))
-            .with_mode(Mode::_0), // is this the right mode?
+            .with_mode(Mode::_0),
     )
     .unwrap()
     .with_sck(hex_a_fast.hs_3)
@@ -400,18 +400,6 @@ mod cunt {
         {
             cs.set_high().await?;
             Ok(Self { bus, cs, delay })
-        }
-
-        /// Returns a reference to the underlying bus object.
-        #[inline]
-        pub fn bus(&self) -> &BUS {
-            &self.bus
-        }
-
-        /// Returns a mutable reference to the underlying bus object.
-        #[inline]
-        pub fn bus_mut(&mut self) -> &mut BUS {
-            &mut self.bus
         }
     }
 
