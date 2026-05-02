@@ -150,13 +150,33 @@ async fn main(spawner: Spawner) {
     // Use channels to indicate readiness properly, mkay.
     Timer::after_millis(500).await;
 
+    let hex_a_fast = r.hexpansion_a;
+    let hex_a_slow = pins.hexpansion_a;
+
+    // Set the rabbit eye LED off
+    let mut r = hex_a_slow
+        .ls_5
+        .into_output(SharedI2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+    r.set_high().await.unwrap();
+    let mut g = hex_a_slow
+        .ls_3
+        .into_output(SharedI2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+    g.set_high().await.unwrap();
+    let mut b = hex_a_slow
+        .ls_4
+        .into_output(SharedI2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+    b.set_high().await.unwrap();
+
     hex_slots
         .set_enabled(HexpansionSlot::A, true)
         .await
         .unwrap();
-
-    let hex_a_fast = r.hexpansion_a;
-    let hex_a_slow = pins.hexpansion_a;
 
     let dma_channel = p.DMA_CH1;
 
@@ -175,7 +195,7 @@ async fn main(spawner: Spawner) {
     let spi = Spi::new(
         p.SPI3,
         Config::default()
-            .with_frequency(Rate::from_mhz(50))
+            .with_frequency(Rate::from_mhz(10))
             .with_mode(Mode::_0),
     )
     .unwrap()
@@ -196,6 +216,7 @@ async fn main(spawner: Spawner) {
     w5500_reset.set_low().await.unwrap();
     Timer::after_millis(100).await;
     w5500_reset.set_high().await.unwrap();
+    Timer::after_millis(100).await;
 
     let w5500_spi_dev: ExclusiveDevice<
         SpiDmaBus<'static, tildagon::esp_hal::Async>,
@@ -212,11 +233,9 @@ async fn main(spawner: Spawner) {
             .unwrap();
     spawner.spawn(ethernet_task(runner)).unwrap();
 
-    // Generate random seed
     let rng = Rng::new();
     let seed = rng.random() as u64;
 
-    // Init network stack
     static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
     let (stack, runner) = embassy_net::new(
         device,
@@ -224,8 +243,6 @@ async fn main(spawner: Spawner) {
         RESOURCES.init(StackResources::new()),
         seed,
     );
-
-    // Launch network task
     spawner.spawn(net_task(runner)).unwrap();
 
     info!("Waiting for DHCP...");
