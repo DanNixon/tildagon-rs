@@ -6,11 +6,11 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use defmt::info;
+use defmt::{info, warn};
 use embassy_executor::Spawner;
 use embassy_net::StackResources;
-use embassy_net_wiznet::{Runner, chip::W5500};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_net_wiznet::{Device, Runner, State, chip::W5500};
+use embassy_time::{Duration, Timer};
 use embedded_graphics::{
     Drawable,
     draw_target::DrawTarget,
@@ -19,6 +19,8 @@ use embedded_graphics::{
     prelude::{Dimensions, Point, RgbColor, Size},
     primitives::Rectangle,
 };
+use embedded_hal_bus::spi::{ExclusiveDevice, NoDelay};
+use embedded_io_async::Write;
 use embedded_text::{
     TextBox,
     alignment::{HorizontalAlignment, VerticalAlignment},
@@ -38,13 +40,13 @@ use tildagon::{
         clock::CpuClock,
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
-        gpio::Input,
+        gpio::{Input, Output},
         interrupt::software::SoftwareInterruptControl,
         rmt::Rmt,
         rng::Rng,
         spi::{
             Mode,
-            master::{Config, Spi},
+            master::{Config, Spi, SpiDmaBus},
         },
         system::Stack,
         time::Rate,
@@ -98,7 +100,7 @@ async fn main(spawner: Spawner) {
         .unwrap();
     usb_sel.set_low().await.unwrap();
 
-    let mut buttons = Buttons::try_new(SharedI2cDevice::new(i2c_system), pins.button)
+    let buttons = Buttons::try_new(SharedI2cDevice::new(i2c_system), pins.button)
         .await
         .unwrap();
 
@@ -162,43 +164,53 @@ async fn main(spawner: Spawner) {
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    // Keep chip select low so that W5500 is always enabled, it is the only device on the bus anyway
+    // Keep chip select asserted so that W5500 is always enabled, it is the only device on the bus anyway
     let mut cs = hex_a_slow
         .ls_1
         .into_output(SharedI2cDevice::new(i2c_system))
         .await
         .unwrap();
-    cs.set_low().await.unwrap();
+    cs.set_high().await.unwrap();
 
-    let mut spi = Spi::new(
+    let spi = Spi::new(
         p.SPI3,
         Config::default()
             .with_frequency(Rate::from_mhz(50))
             .with_mode(Mode::_0),
     )
     .unwrap()
-    .with_sck(hex_a_fast.hs_1)
-    .with_mosi(hex_a_fast.hs_2)
-    .with_miso(hex_a_fast.hs_3)
+    .with_sck(hex_a_fast.hs_3)
+    .with_mosi(hex_a_fast.hs_1)
+    .with_miso(hex_a_fast.hs_2)
     .with_dma(dma_channel)
     .with_buffers(dma_rx_buf, dma_tx_buf)
     .into_async();
 
     let w5500_int = Input::new(hex_a_fast.hs_4, Default::default());
 
-    let w5500_reset = hex_a_slow
+    let mut w5500_reset = hex_a_slow
         .ls_2
         .into_output(SharedI2cDevice::new(i2c_system))
         .await
         .unwrap();
+    w5500_reset.set_low().await.unwrap();
+    Timer::after_millis(100).await;
+    w5500_reset.set_high().await.unwrap();
 
-    // TODO: just mock the reset pin and assert it manually before creating the device
+    let w5500_spi_dev: ExclusiveDevice<
+        SpiDmaBus<'static, tildagon::esp_hal::Async>,
+        FakePin,
+        NoDelay,
+    > = ExclusiveDevice::new(spi, FakePin {}, NoDelay).unwrap();
+
     let mac_addr = [0x02, 0x00, 0x00, 0x00, 0x00, 0x00];
     static STATE: StaticCell<State<8, 8>> = StaticCell::new();
     let state = STATE.init(State::<8, 8>::new());
     let (device, runner) =
-        embassy_net_wiznet::new(mac_addr, state, spi_dev, w5500_int, w5500_reset).unwrap();
-    spawner.spawn(unwrap!(ethernet_task(runner)));
+        embassy_net_wiznet::new(mac_addr, state, w5500_spi_dev, w5500_int, FakePin {})
+            .await
+            .unwrap();
+    spawner.spawn(ethernet_task(runner)).unwrap();
 
     // Generate random seed
     let rng = Rng::new();
@@ -214,7 +226,7 @@ async fn main(spawner: Spawner) {
     );
 
     // Launch network task
-    spawner.spawn(unwrap!(net_task(runner)));
+    spawner.spawn(net_task(runner)).unwrap();
 
     info!("Waiting for DHCP...");
     stack.wait_link_up().await;
@@ -223,11 +235,55 @@ async fn main(spawner: Spawner) {
     let local_addr = cfg.address.address();
     info!("IP address: {:?}", local_addr);
 
-    let mut tick = Ticker::every(Duration::from_secs(60));
-
+    let mut rx_buffer = [0; 4096];
+    let mut tx_buffer = [0; 4096];
+    let mut buf = [0; 4096];
     loop {
-        // TODO
-        tick.next().await;
+        let mut socket = embassy_net::tcp::TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
+        socket.set_timeout(Some(Duration::from_secs(10)));
+
+        info!("Listening on TCP:1234...");
+        if let Err(e) = socket.accept(1234).await {
+            warn!("accept error: {:?}", e);
+            continue;
+        }
+        info!("Received connection from {:?}", socket.remote_endpoint());
+
+        loop {
+            let n = match socket.read(&mut buf).await {
+                Ok(0) => {
+                    warn!("read EOF");
+                    break;
+                }
+                Ok(n) => n,
+                Err(e) => {
+                    warn!("{:?}", e);
+                    break;
+                }
+            };
+            info!("rxd {}", core::str::from_utf8(&buf[..n]).unwrap());
+
+            if let Err(e) = socket.write_all(&buf[..n]).await {
+                warn!("write error: {:?}", e);
+                break;
+            }
+        }
+    }
+}
+
+struct FakePin {}
+
+impl embedded_hal::digital::ErrorType for FakePin {
+    type Error = embedded_hal::digital::ErrorKind;
+}
+
+impl embedded_hal::digital::OutputPin for FakePin {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 
@@ -236,9 +292,9 @@ async fn ethernet_task(
     runner: Runner<
         'static,
         W5500,
-        ExclusiveDevice<Spi<'static, SPI0, Async>, Output<'static>, Delay>,
+        ExclusiveDevice<SpiDmaBus<'static, tildagon::esp_hal::Async>, FakePin, NoDelay>,
         Input<'static>,
-        Output<'static>,
+        FakePin,
     >,
 ) -> ! {
     runner.run().await
@@ -280,7 +336,7 @@ async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
 
     leds.write().unwrap();
 
-    let mut colour = Hsv {
+    let colour = Hsv {
         hue: 0,
         sat: 255,
         val: 127,
