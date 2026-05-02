@@ -9,11 +9,12 @@ test = false
 bench = false
 
 [dependencies]
+chrono = { version = "0.4.44", default-features = false, features = ["defmt"] }
 critical-section = "1.2.0"
 defmt = "1.0.1"
 embassy-executor = { version = "0.9.1", features = ["defmt"] }
 embassy-futures = "0.1.2"
-embassy-net = { version = "0.9.1", features = ["defmt", "medium-ethernet", "tcp", "dhcpv4"] }
+embassy-net = { version = "0.9.1", features = ["defmt", "medium-ethernet", "dns", "tcp", "dhcpv4"] }
 embassy-net-wiznet = { version = "0.3.0", features = ["defmt"] }
 embassy-sync = "0.8.0"
 embassy-time = { version = "0.5.1", features = ["defmt"] }
@@ -27,8 +28,11 @@ esp-alloc = { version = "0.9.0", features = ["defmt"] }
 esp-bootloader-esp-idf = { version = "0.4.0", features = ["esp32s3"] }
 esp-rtos = { version = "0.2.0", features = ["esp32s3", "embassy"] }
 panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
+portable-atomic = { version = "1.13.1", features = ["critical-section"] }
 rtt-target = { version = "0.6.1", features = ["defmt"] }
 smart-leds = "0.4.0"
+sntpc = { version = "0.9.0", features = ["defmt"] }
+sntpc-net-embassy = { version = "0.9.0", default-features = false, features = ["defmt"] }
 static_cell = { version = "2.1.0", features = ["nightly"] }
 tildagon = { path = "../../", features = ["top-board-2024"] }
 

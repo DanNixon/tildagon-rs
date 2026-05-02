@@ -6,11 +6,14 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use defmt::{info, warn};
+mod exclusive_device;
+mod wall_time;
+
+use defmt::info;
 use embassy_executor::Spawner;
 use embassy_net::StackResources;
 use embassy_net_wiznet::{Device, Runner, State, chip::W5500};
-use embassy_time::{Duration, Timer};
+use embassy_time::Timer;
 use embedded_graphics::{
     Drawable,
     draw_target::DrawTarget,
@@ -19,14 +22,13 @@ use embedded_graphics::{
     prelude::{Dimensions, Point, RgbColor, Size},
     primitives::Rectangle,
 };
-use embedded_hal_bus::spi::{ExclusiveDevice, NoDelay};
-use embedded_io_async::Write;
 use embedded_text::{
     TextBox,
     alignment::{HorizontalAlignment, VerticalAlignment},
     style::TextBoxStyleBuilder,
 };
 use esp_rtos::embassy::Executor;
+use exclusive_device::ExclusiveDevice;
 use panic_rtt_target as _;
 use smart_leds::{
     RGB8,
@@ -100,7 +102,7 @@ async fn main(spawner: Spawner) {
         .unwrap();
     usb_sel.set_low().await.unwrap();
 
-    let buttons = Buttons::try_new(SharedI2cDevice::new(i2c_system), pins.button)
+    let _buttons = Buttons::try_new(SharedI2cDevice::new(i2c_system), pins.button)
         .await
         .unwrap();
 
@@ -218,7 +220,7 @@ async fn main(spawner: Spawner) {
     w5500_reset.set_high().await.unwrap();
     Timer::after_millis(100).await;
 
-    let w5500_spi_dev = cunt::ExclusiveDevice::new(spi, cs, embassy_time::Delay)
+    let w5500_spi_dev = ExclusiveDevice::new(spi, cs, embassy_time::Delay)
         .await
         .unwrap();
 
@@ -250,39 +252,11 @@ async fn main(spawner: Spawner) {
     let local_addr = cfg.address.address();
     info!("IP address: {:?}", local_addr);
 
-    let mut rx_buffer = [0; 4096];
-    let mut tx_buffer = [0; 4096];
-    let mut buf = [0; 4096];
+    spawner.spawn(wall_time::ntp_task(stack)).unwrap();
+
     loop {
-        let mut socket = embassy_net::tcp::TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-        socket.set_timeout(Some(Duration::from_secs(10)));
-
-        info!("Listening on TCP:1234...");
-        if let Err(e) = socket.accept(1234).await {
-            warn!("accept error: {:?}", e);
-            continue;
-        }
-        info!("Received connection from {:?}", socket.remote_endpoint());
-
-        loop {
-            let n = match socket.read(&mut buf).await {
-                Ok(0) => {
-                    warn!("read EOF");
-                    break;
-                }
-                Ok(n) => n,
-                Err(e) => {
-                    warn!("{:?}", e);
-                    break;
-                }
-            };
-            info!("rxd {}", core::str::from_utf8(&buf[..n]).unwrap());
-
-            if let Err(e) = socket.write_all(&buf[..n]).await {
-                warn!("write error: {:?}", e);
-                break;
-            }
-        }
+        info!("Time now: {}", wall_time::now());
+        Timer::after_secs(1).await;
     }
 }
 
@@ -307,7 +281,7 @@ async fn ethernet_task(
     runner: Runner<
         'static,
         W5500,
-        cunt::ExclusiveDevice<
+        ExclusiveDevice<
             SpiDmaBus<'static, tildagon::esp_hal::Async>,
             tildagon::pins::OutputPin<SharedI2cDevice<SystemI2cBus>>,
             embassy_time::Delay,
@@ -364,97 +338,5 @@ async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
     loop {
         // TODO
         Timer::after_secs(30).await;
-    }
-}
-
-/////////
-
-mod cunt {
-    use embedded_hal::spi::{ErrorType, Operation};
-    use embedded_hal_async::{
-        delay::DelayNs as AsyncDelayNs,
-        spi::{SpiBus, SpiDevice},
-    };
-    use embedded_hal_bus::spi::DeviceError;
-    use tildagon::pins::async_digital::OutputPin;
-
-    /// [`SpiDevice`] implementation with exclusive access to the bus (not shared).
-    ///
-    /// This is the most straightforward way of obtaining an [`SpiDevice`] from an [`SpiBus`],
-    /// ideal for when no sharing is required (only one SPI device is present on the bus).
-    pub struct ExclusiveDevice<BUS, CS, D> {
-        bus: BUS,
-        cs: CS,
-        delay: D,
-    }
-
-    impl<BUS, CS, D> ExclusiveDevice<BUS, CS, D> {
-        /// Create a new [`ExclusiveDevice`].
-        ///
-        /// This sets the `cs` pin high, and returns an error if that fails. It is recommended
-        /// to set the pin high the moment it's configured as an output, to avoid glitches.
-        #[inline]
-        pub async fn new(bus: BUS, mut cs: CS, delay: D) -> Result<Self, CS::Error>
-        where
-            CS: OutputPin,
-        {
-            cs.set_high().await?;
-            Ok(Self { bus, cs, delay })
-        }
-    }
-
-    impl<BUS, CS, D> ErrorType for ExclusiveDevice<BUS, CS, D>
-    where
-        BUS: ErrorType,
-        CS: OutputPin,
-    {
-        type Error = DeviceError<BUS::Error, CS::Error>;
-    }
-
-    impl<Word: Copy + 'static, BUS, CS, D> SpiDevice<Word> for ExclusiveDevice<BUS, CS, D>
-    where
-        BUS: SpiBus<Word>,
-        CS: OutputPin,
-        D: AsyncDelayNs,
-    {
-        #[inline]
-        async fn transaction(
-            &mut self,
-            operations: &mut [Operation<'_, Word>],
-        ) -> Result<(), Self::Error> {
-            self.cs.set_low().await.map_err(DeviceError::Cs)?;
-
-            let op_res = 'ops: {
-                for op in operations {
-                    let res = match op {
-                        Operation::Read(buf) => self.bus.read(buf).await,
-                        Operation::Write(buf) => self.bus.write(buf).await,
-                        Operation::Transfer(read, write) => self.bus.transfer(read, write).await,
-                        Operation::TransferInPlace(buf) => self.bus.transfer_in_place(buf).await,
-                        Operation::DelayNs(ns) => match self.bus.flush().await {
-                            Err(e) => Err(e),
-                            Ok(()) => {
-                                self.delay.delay_ns(*ns).await;
-                                Ok(())
-                            }
-                        },
-                    };
-                    if let Err(e) = res {
-                        break 'ops Err(e);
-                    }
-                }
-                Ok(())
-            };
-
-            // On failure, it's important to still flush and deassert CS.
-            let flush_res = self.bus.flush().await;
-            let cs_res = self.cs.set_high().await;
-
-            op_res.map_err(DeviceError::Spi)?;
-            flush_res.map_err(DeviceError::Spi)?;
-            cs_res.map_err(DeviceError::Cs)?;
-
-            Ok(())
-        }
     }
 }
