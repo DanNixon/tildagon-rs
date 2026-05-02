@@ -184,19 +184,19 @@ async fn main(spawner: Spawner) {
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    // Keep chip select asserted so that W5500 is always enabled, it is the only device on the bus anyway
-    let mut cs = hex_a_slow
+    // TODO version of exclusive device that allows async chip select
+    // https://docs.rs/embedded-hal-bus/latest/src/embedded_hal_bus/spi/exclusive.rs.html
+    let cs = hex_a_slow
         .ls_1
         .into_output(SharedI2cDevice::new(i2c_system))
         .await
         .unwrap();
-    cs.set_high().await.unwrap();
 
     let spi = Spi::new(
         p.SPI3,
         Config::default()
             .with_frequency(Rate::from_mhz(10))
-            .with_mode(Mode::_0),
+            .with_mode(Mode::_0), // is this the right mode?
     )
     .unwrap()
     .with_sck(hex_a_fast.hs_3)
