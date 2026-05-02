@@ -27,6 +27,7 @@ embedded-text = "0.7.2"
 esp-alloc = { version = "0.9.0", features = ["defmt"] }
 esp-bootloader-esp-idf = { version = "0.4.0", features = ["esp32s3"] }
 esp-rtos = { version = "0.2.0", features = ["esp32s3", "embassy"] }
+heapless = { version = "0.9.3", features = ["defmt"] }
 panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
 portable-atomic = { version = "1.13.1", features = ["critical-section"] }
 rtt-target = { version = "0.6.1", features = ["defmt"] }

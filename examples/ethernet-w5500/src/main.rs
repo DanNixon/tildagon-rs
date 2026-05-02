@@ -9,17 +9,19 @@
 mod exclusive_device;
 mod wall_time;
 
+use chrono::{DateTime, Datelike, FixedOffset, Timelike};
+use core::fmt::Write;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_net::StackResources;
 use embassy_net_wiznet::{Device, Runner, State, chip::W5500};
-use embassy_time::Timer;
+use embassy_time::{Duration, Ticker, Timer};
 use embedded_graphics::{
     Drawable,
     draw_target::DrawTarget,
     mono_font::{MonoTextStyleBuilder, ascii::FONT_10X20},
     pixelcolor::Rgb565,
-    prelude::{Dimensions, Point, RgbColor, Size},
+    prelude::{Dimensions, RgbColor},
     primitives::Rectangle,
 };
 use embedded_text::{
@@ -186,8 +188,6 @@ async fn main(spawner: Spawner) {
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    // TODO version of exclusive device that allows async chip select
-    // https://docs.rs/embedded-hal-bus/latest/src/embedded_hal_bus/spi/exclusive.rs.html
     let cs = hex_a_slow
         .ls_1
         .into_output(SharedI2cDevice::new(i2c_system))
@@ -315,11 +315,42 @@ async fn display_task(top_board: TopBoardResources<'static>, display: DisplayRes
         .build();
 
     let centre = display.bounding_box().center();
-    let width = display.bounding_box().size.width;
+
+    let mut tick = Ticker::every(Duration::from_hz(1));
 
     loop {
-        // TODO
-        Timer::after_secs(30).await;
+        tick.next().await;
+
+        let mut str = heapless::String::<100>::new();
+        match wall_time::now() {
+            Some(time) => {
+                let time: DateTime<FixedOffset> =
+                    time.with_timezone(&FixedOffset::west_opt(60 * 60).unwrap());
+                str.write_fmt(format_args!(
+                    "{:04}-{:02}-{:02}\n{:02}:{:02}:{:02}",
+                    time.year(),
+                    time.month(),
+                    time.day(),
+                    time.hour(),
+                    time.minute(),
+                    time.second()
+                ))
+                .unwrap();
+            }
+            None => {
+                str.write_str("xxxx-xx-xx\nxx:xx:xx").unwrap();
+            }
+        }
+
+        display.clear(Rgb565::BLACK).unwrap();
+        TextBox::with_textbox_style(
+            &str,
+            Rectangle::with_center(centre, display.bounding_box().size),
+            character_style,
+            textbox_style,
+        )
+        .draw(&mut display)
+        .unwrap();
     }
 }
 
@@ -335,8 +366,11 @@ async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
         val: 127,
     };
 
+    let mut tick = Ticker::every(Duration::from_hz(1));
+
     loop {
+        tick.next().await;
+
         // TODO
-        Timer::after_secs(30).await;
     }
 }
