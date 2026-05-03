@@ -189,7 +189,7 @@ async fn main(spawner: Spawner) {
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let cs = hex_a_slow
-        .ls_1
+        .ls_2
         .into_output(SharedI2cDevice::new(i2c_system))
         .await
         .unwrap();
@@ -201,17 +201,17 @@ async fn main(spawner: Spawner) {
             .with_mode(Mode::_0),
     )
     .unwrap()
-    .with_sck(hex_a_fast.hs_3)
-    .with_mosi(hex_a_fast.hs_1)
-    .with_miso(hex_a_fast.hs_2)
+    .with_sck(hex_a_fast.hs_2)
+    .with_mosi(hex_a_fast.hs_3)
+    .with_miso(hex_a_fast.hs_4)
     .with_dma(dma_channel)
     .with_buffers(dma_rx_buf, dma_tx_buf)
     .into_async();
 
-    let w5500_int = Input::new(hex_a_fast.hs_4, Default::default());
+    let w5500_int = Input::new(hex_a_fast.hs_1, Default::default());
 
     let mut w5500_reset = hex_a_slow
-        .ls_2
+        .ls_1
         .into_output(SharedI2cDevice::new(i2c_system))
         .await
         .unwrap();
