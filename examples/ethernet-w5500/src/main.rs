@@ -9,20 +9,17 @@
 mod display;
 mod exclusive_device;
 mod fake_pin;
+mod leds;
 mod wall_time;
 
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_net::StackResources;
 use embassy_net_wiznet::{Device, Runner, State, chip::W5500};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::Timer;
 use esp_rtos::embassy::Executor;
 use exclusive_device::ExclusiveDevice;
 use panic_rtt_target as _;
-use smart_leds::{
-    RGB8,
-    hsv::{Hsv, hsv2rgb},
-};
 use static_cell::StaticCell;
 use tildagon::{
     buttons::Buttons,
@@ -136,7 +133,7 @@ async fn main(spawner: Spawner) {
         },
     );
 
-    spawner.must_spawn(led_task(leds));
+    spawner.must_spawn(leds::task(leds));
 
     // A little time for other tasks to start.
     // Hacky as all fuck but good enough for a demo.
@@ -274,25 +271,4 @@ async fn ethernet_task(
 #[embassy_executor::task]
 async fn net_task(mut runner: embassy_net::Runner<'static, Device<'static>>) -> ! {
     runner.run().await
-}
-
-#[embassy_executor::task]
-async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
-    *leds.main_board_pixel() = RGB8::new(128, 0, 128);
-
-    leds.write().unwrap();
-
-    let colour = Hsv {
-        hue: 0,
-        sat: 255,
-        val: 127,
-    };
-
-    let mut tick = Ticker::every(Duration::from_hz(1));
-
-    loop {
-        tick.next().await;
-
-        // TODO
-    }
 }
