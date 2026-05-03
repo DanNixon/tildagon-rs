@@ -17,8 +17,8 @@ use embassy_executor::Spawner;
 use embassy_net::StackResources;
 use embassy_net_wiznet::{Device, Runner, State, chip::W5500};
 use embassy_time::Timer;
-use esp_rtos::embassy::Executor;
 use exclusive_device::ExclusiveDevice;
+use fake_pin::FakePin;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
@@ -29,7 +29,6 @@ use tildagon::{
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
         gpio::Input,
-        interrupt::software::SoftwareInterruptControl,
         rmt::Rmt,
         rng::Rng,
         spi::{
@@ -46,8 +45,6 @@ use tildagon::{
     pins::{PinControl, async_digital::OutputPin},
     resources::*,
 };
-
-use crate::fake_pin::FakePin;
 
 extern crate alloc;
 
@@ -118,50 +115,33 @@ async fn main(spawner: Spawner) {
     static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
     let app_core_stack = APP_CORE_STACK.init(Stack::new());
 
-    let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-    esp_rtos::start_second_core(
-        p.CPU_CTRL,
-        sw_int.software_interrupt0,
-        sw_int.software_interrupt1,
-        app_core_stack,
-        move || {
-            static EXECUTOR: StaticCell<Executor> = StaticCell::new();
-            let executor = EXECUTOR.init(Executor::new());
-            executor.run(|spawner| {
-                spawner.must_spawn(display::task(r.top_board, r.display));
-            });
-        },
-    );
-
     spawner.must_spawn(leds::task(leds));
-
-    // A little time for other tasks to start.
-    // Hacky as all fuck but good enough for a demo.
-    // Use channels to indicate readiness properly, mkay.
-    Timer::after_millis(500).await;
 
     let hex_a_fast = r.hexpansion_a;
     let hex_a_slow = pins.hexpansion_a;
 
     // Set the rabbit eye LED off
-    let mut r = hex_a_slow
-        .ls_5
-        .into_output(SharedI2cDevice::new(i2c_system))
-        .await
-        .unwrap();
-    r.set_high().await.unwrap();
-    let mut g = hex_a_slow
-        .ls_3
-        .into_output(SharedI2cDevice::new(i2c_system))
-        .await
-        .unwrap();
-    g.set_high().await.unwrap();
-    let mut b = hex_a_slow
-        .ls_4
-        .into_output(SharedI2cDevice::new(i2c_system))
-        .await
-        .unwrap();
-    b.set_high().await.unwrap();
+    // TODO: temporary thing
+    {
+        let mut r = hex_a_slow
+            .ls_5
+            .into_output(SharedI2cDevice::new(i2c_system))
+            .await
+            .unwrap();
+        r.set_high().await.unwrap();
+        let mut g = hex_a_slow
+            .ls_3
+            .into_output(SharedI2cDevice::new(i2c_system))
+            .await
+            .unwrap();
+        g.set_high().await.unwrap();
+        let mut b = hex_a_slow
+            .ls_4
+            .into_output(SharedI2cDevice::new(i2c_system))
+            .await
+            .unwrap();
+        b.set_high().await.unwrap();
+    }
 
     hex_slots
         .set_enabled(HexpansionSlot::A, true)
@@ -235,6 +215,8 @@ async fn main(spawner: Spawner) {
         seed,
     );
     spawner.spawn(net_task(runner)).unwrap();
+
+    spawner.must_spawn(display::task(r.top_board, r.display, stack));
 
     info!("Waiting for DHCP...");
     stack.wait_link_up().await;
