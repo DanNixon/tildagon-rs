@@ -244,11 +244,6 @@ async fn main(spawner: Spawner) {
     info!("IP address: {:?}", local_addr);
 
     spawner.spawn(wall_time::ntp_task(stack)).unwrap();
-
-    loop {
-        info!("Time now: {}", wall_time::now());
-        Timer::after_secs(1).await;
-    }
 }
 
 #[embassy_executor::task]
