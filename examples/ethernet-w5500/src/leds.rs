@@ -21,8 +21,14 @@ pub(super) async fn task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>)
                 let time = time.with_timezone(&FixedOffset::east_opt(60 * 60).unwrap());
 
                 let hour_pixel_idx = (time.hour12().1 - 1) as usize;
-                let minute_pixel_idx = (time.minute() / 5) as usize;
-                let second_pixel_idx = (time.second() / 5) as usize;
+                let minute_pixel_idx = match (time.minute() / 5) as usize {
+                    0 => 11,
+                    n => n - 1,
+                };
+                let second_pixel_idx = match (time.second() / 5) as usize {
+                    0 => 11,
+                    n => n - 1,
+                };
 
                 leds.front_pixels().fill(RGB8::default());
                 leds.front_pixels()[hour_pixel_idx] =
