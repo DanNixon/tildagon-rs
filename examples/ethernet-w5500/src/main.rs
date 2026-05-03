@@ -35,7 +35,6 @@ use tildagon::{
             Mode,
             master::{Config, Spi, SpiDmaBus},
         },
-        system::Stack,
         time::Rate,
         timer::timg::TimerGroup,
     },
@@ -111,9 +110,6 @@ async fn main(spawner: Spawner) {
     .await
     .unwrap();
     leds.set_power(true).await.unwrap();
-
-    static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
-    let app_core_stack = APP_CORE_STACK.init(Stack::new());
 
     spawner.must_spawn(leds::task(leds));
 

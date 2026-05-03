@@ -50,7 +50,7 @@ pub(super) async fn task(
 
                 time_string
                     .write_fmt(format_args!(
-                        "{:04}-{:02}-{:02}\n{:02}:{:02}:UTC{:02}\n{}",
+                        "{:04}-{:02}-{:02}\n{:02}:{:02}:{:02}\nUTC{}",
                         time.year(),
                         time.month(),
                         time.day(),
