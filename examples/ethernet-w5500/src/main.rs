@@ -325,7 +325,7 @@ async fn display_task(top_board: TopBoardResources<'static>, display: DisplayRes
         match wall_time::now() {
             Some(time) => {
                 let time: DateTime<FixedOffset> =
-                    time.with_timezone(&FixedOffset::west_opt(60 * 60).unwrap());
+                    time.with_timezone(&FixedOffset::east_opt(60 * 60).unwrap());
                 str.write_fmt(format_args!(
                     "{:04}-{:02}-{:02}\n{:02}:{:02}:{:02}",
                     time.year(),
