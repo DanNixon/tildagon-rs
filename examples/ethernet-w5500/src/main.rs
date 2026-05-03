@@ -8,6 +8,7 @@
 
 mod display;
 mod exclusive_device;
+mod fake_pin;
 mod wall_time;
 
 use defmt::info;
@@ -48,6 +49,8 @@ use tildagon::{
     pins::{PinControl, async_digital::OutputPin},
     resources::*,
 };
+
+use crate::fake_pin::FakePin;
 
 extern crate alloc;
 
@@ -213,10 +216,15 @@ async fn main(spawner: Spawner) {
     let mac_addr = [0x02, 0x00, 0x00, 0x00, 0x00, 0x00];
     static STATE: StaticCell<State<8, 8>> = StaticCell::new();
     let state = STATE.init(State::<8, 8>::new());
-    let (device, runner) =
-        embassy_net_wiznet::new(mac_addr, state, w5500_spi_dev, w5500_int, FakePin {})
-            .await
-            .unwrap();
+    let (device, runner) = embassy_net_wiznet::new(
+        mac_addr,
+        state,
+        w5500_spi_dev,
+        w5500_int,
+        FakePin::default(),
+    )
+    .await
+    .unwrap();
     spawner.spawn(ethernet_task(runner)).unwrap();
 
     let rng = Rng::new();
@@ -243,22 +251,6 @@ async fn main(spawner: Spawner) {
     loop {
         info!("Time now: {}", wall_time::now());
         Timer::after_secs(1).await;
-    }
-}
-
-struct FakePin {}
-
-impl embedded_hal::digital::ErrorType for FakePin {
-    type Error = embedded_hal::digital::ErrorKind;
-}
-
-impl embedded_hal::digital::OutputPin for FakePin {
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        Ok(())
     }
 }
 
