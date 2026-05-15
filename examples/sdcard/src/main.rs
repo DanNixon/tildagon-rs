@@ -9,6 +9,7 @@
 mod exclusive_device;
 mod fake_pin;
 
+use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::Delay;
 use embedded_hal_bus::spi::ExclusiveDevice;
@@ -33,7 +34,10 @@ use tildagon::{
     hexpansion_slots::{HexpansionSlot, HexpansionSlotControl},
     i2c::{SharedI2cBus, SharedI2cDevice},
     leds::Leds,
-    pins::{PinControl, async_digital::OutputPin},
+    pins::{
+        PinControl,
+        async_digital::{InputPin, OutputPin},
+    },
     resources::*,
 };
 
@@ -44,7 +48,7 @@ extern crate alloc;
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_rtos::main]
-async fn main(spawner: Spawner) {
+async fn main(_spawner: Spawner) {
     rtt_target::rtt_init_defmt!();
 
     let config = tildagon::esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -111,6 +115,26 @@ async fn main(spawner: Spawner) {
         .await
         .unwrap();
 
+    let mut card_detect_1 = hex_a_slow
+        .ls_1
+        .into_input(SharedI2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+    let mut card_detect_2 = hex_a_slow
+        .ls_4
+        .into_input(SharedI2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+
+    let cs_2 = hex_a_slow
+        .ls_5
+        .into_output(SharedI2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+
+    info!("Card 1 detect: {}", card_detect_1.is_low().await);
+    info!("Card 2 detect: {}", card_detect_2.is_low().await);
+
     let dma_channel = p.DMA_CH1;
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
@@ -120,7 +144,7 @@ async fn main(spawner: Spawner) {
     let spi = Spi::new(
         p.SPI3,
         Config::default()
-            .with_frequency(Rate::from_mhz(10))
+            .with_frequency(Rate::from_mhz(16))
             .with_mode(Mode::_0),
     )
     .unwrap()
@@ -135,6 +159,6 @@ async fn main(spawner: Spawner) {
     let dev = ExclusiveDevice::new(spi, cs, Delay).unwrap();
 
     let sdcard = embedded_sdmmc::SdCard::new(dev, Delay);
-    defmt::info!("Card type {}", sdcard.get_card_type());
-    defmt::info!("Card size is {} bytes", sdcard.num_bytes().unwrap());
+    info!("Card type {}", sdcard.get_card_type());
+    info!("Card size is {} bytes", sdcard.num_bytes().unwrap());
 }
