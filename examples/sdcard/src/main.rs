@@ -126,11 +126,12 @@ async fn main(_spawner: Spawner) {
         .await
         .unwrap();
 
-    let cs_2 = hex_a_slow
+    let mut cs_2 = hex_a_slow
         .ls_5
         .into_output(SharedI2cDevice::new(i2c_system))
         .await
         .unwrap();
+    cs_2.set_high().await.unwrap();
 
     info!("Card 1 detect: {}", card_detect_1.is_low().await);
     info!("Card 2 detect: {}", card_detect_2.is_low().await);
