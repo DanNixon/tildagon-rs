@@ -11,7 +11,7 @@ mod fake_pin;
 
 use defmt::info;
 use embassy_executor::Spawner;
-use embassy_time::Delay;
+use embassy_time::{Delay, Timer};
 use embedded_hal_bus::spi::ExclusiveDevice;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
@@ -133,9 +133,6 @@ async fn main(_spawner: Spawner) {
         .unwrap();
     cs_2.set_high().await.unwrap();
 
-    info!("Card 1 detect: {}", card_detect_1.is_low().await);
-    info!("Card 2 detect: {}", card_detect_2.is_low().await);
-
     let dma_channel = p.DMA_CH1;
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
@@ -158,8 +155,14 @@ async fn main(_spawner: Spawner) {
     let cs = Output::new(hex_a_fast.hs_1, Level::High, Default::default());
 
     let dev = ExclusiveDevice::new(spi, cs, Delay).unwrap();
-
     let sdcard = embedded_sdmmc::SdCard::new(dev, Delay);
-    info!("Card type {}", sdcard.get_card_type());
-    info!("Card size is {} bytes", sdcard.num_bytes().unwrap());
+
+    loop {
+        info!("Card 1 detect: {}", card_detect_1.is_low().await);
+        info!("Card 2 detect: {}", card_detect_2.is_low().await);
+        info!("Card type {}", sdcard.get_card_type());
+        info!("Card size is {} bytes", sdcard.num_bytes().unwrap());
+
+        Timer::after_secs(2).await;
+    }
 }
