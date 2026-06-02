@@ -6,7 +6,6 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use bmi2::types::{Data, PwrCtrl};
 use core::fmt::Write;
 use defmt::info;
 use embassy_executor::Spawner;
@@ -41,6 +40,7 @@ use tildagon::{
         system::Stack, time::Rate, timer::timg::TimerGroup,
     },
     i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
+    imu::bmi2::types::{Data, PwrCtrl},
     leds::Leds,
     pins::{PinControl, async_digital::OutputPin},
     resources::*,

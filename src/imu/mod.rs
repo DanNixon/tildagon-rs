@@ -2,6 +2,9 @@ use crate::i2c::{BlockingI2cDeviceWrapper, SharedI2cDevice, SystemI2cBus};
 use bmi2::{Bmi2, I2cAddr, config::BMI270_CONFIG_FILE, interface::I2cInterface, types::Burst};
 use defmt::info;
 
+// Re-export driver crate
+pub use bmi2;
+
 pub type I2cDevice = SharedI2cDevice<SystemI2cBus>;
 pub type Imu = Bmi2<I2cInterface<BlockingI2cDeviceWrapper<I2cDevice>>, embassy_time::Delay, 256>;
 

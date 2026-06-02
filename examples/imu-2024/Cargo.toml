@@ -9,7 +9,6 @@ test = false
 bench = false
 
 [dependencies]
-bmi2 = "0.1.2"
 critical-section = "1.2.0"
 defmt = "1.0.1"
 embassy-executor = { version = "0.9.1", features = ["defmt"] }
