@@ -52,6 +52,33 @@ impl<I2C> embedded_hal::digital::ErrorType for InputPin<I2C> {
     type Error = ErrorKind;
 }
 
+impl<I2C, E> embedded_hal::digital::InputPin for InputPin<I2C>
+where
+    I2C: embedded_hal_async::i2c::I2c<Error = E>,
+{
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
+        Ok(!self.is_low()?)
+    }
+
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
+        let register = match self.pin.port() {
+            Port::Port0 => Register::INPUT_P0,
+            Port::Port1 => Register::INPUT_P1,
+        };
+
+        let value = embassy_futures::block_on(async {
+            read_register(&mut self.bus, self.pin.address(), register)
+                .await
+                .map_err(|_| ErrorKind::Other)
+        })?;
+
+        let is_low = value & self.pin.bit() == 0;
+
+        debug!("Pin {} is low? {}", self.pin, is_low);
+        Ok(is_low)
+    }
+}
+
 impl<I2C, E> super::async_digital::InputPin for InputPin<I2C>
 where
     I2C: embedded_hal_async::i2c::I2c<Error = E>,

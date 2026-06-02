@@ -29,6 +29,27 @@ impl<I2C> embedded_hal::digital::ErrorType for OutputPin<I2C> {
     type Error = ErrorKind;
 }
 
+impl<I2C, E> embedded_hal::digital::OutputPin for OutputPin<I2C>
+where
+    I2C: embedded_hal_async::i2c::I2c<Error = E>,
+{
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        self.set_state(PinState::High)
+    }
+
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        self.set_state(PinState::Low)
+    }
+
+    fn set_state(&mut self, state: PinState) -> Result<(), Self::Error> {
+        embassy_futures::block_on(async {
+            set_io_state(&mut self.bus, &self.pin, state)
+                .await
+                .map_err(|_| ErrorKind::Other)
+        })
+    }
+}
+
 impl<I2C, E> super::async_digital::OutputPin for OutputPin<I2C>
 where
     I2C: embedded_hal_async::i2c::I2c<Error = E>,
