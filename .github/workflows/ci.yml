@@ -46,6 +46,7 @@ jobs:
           - ethernet-w5500
           - i2c-scan
           - imu-2024
+          - slow-io
 
     steps:
       - uses: actions/checkout@v6
