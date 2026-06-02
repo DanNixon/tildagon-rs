@@ -6,6 +6,7 @@
     holding buffers for the duration of a data transfer."
 )]
 
+use bmi2::types::{Data, PwrCtrl};
 use core::fmt::Write;
 use defmt::info;
 use embassy_executor::Spawner;
@@ -40,7 +41,6 @@ use tildagon::{
         system::Stack, time::Rate, timer::timg::TimerGroup,
     },
     i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
-    imu::bmi2::types::{Data, PwrCtrl},
     leds::Leds,
     pins::{PinControl, async_digital::OutputPin},
     resources::*,
@@ -116,7 +116,6 @@ async fn main(spawner: Spawner) {
         acc_en: true,
         temp_en: false,
     })
-    .await
     .unwrap();
 
     static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
@@ -159,9 +158,17 @@ async fn main(spawner: Spawner) {
                 }
             }
             Either::Second(_) => {
-                let data = imu.get_data().await.unwrap();
-                info!("IMU axis data: {}", data);
-                event_pub.publish(Event::ImuAxisData(data)).await;
+                let data: Data = imu.get_data().unwrap();
+                event_pub
+                    .publish(Event::ImuAxisData(ImuData {
+                        gyro_x: data.gyr.x,
+                        gyro_y: data.gyr.y,
+                        gyro_z: data.gyr.z,
+                        accel_x: data.acc.x,
+                        accel_y: data.acc.y,
+                        accel_z: data.acc.z,
+                    }))
+                    .await;
             }
         }
     }
@@ -171,7 +178,17 @@ async fn main(spawner: Spawner) {
 enum Event {
     Button,
     // Button(ButtonEvent),
-    ImuAxisData(Data),
+    ImuAxisData(ImuData),
+}
+
+#[derive(Clone)]
+struct ImuData {
+    gyro_x: i16,
+    gyro_y: i16,
+    gyro_z: i16,
+    accel_x: i16,
+    accel_y: i16,
+    accel_z: i16,
 }
 
 static EVENT_CHANNEL: PubSubChannel<CriticalSectionRawMutex, Event, 12, 4, 4> =
@@ -237,12 +254,12 @@ async fn display_task(top_board: TopBoardResources<'static>, display: DisplayRes
                 }
 
                 for (reading, bbox) in [
-                    (data.gyr.x, box_gx),
-                    (data.gyr.y, box_gy),
-                    (data.gyr.z, box_gz),
-                    (data.acc.x, box_ax),
-                    (data.acc.y, box_ay),
-                    (data.acc.z, box_az),
+                    (data.gyro_x, box_gx),
+                    (data.gyro_y, box_gy),
+                    (data.gyro_z, box_gz),
+                    (data.accel_x, box_ax),
+                    (data.accel_y, box_ay),
+                    (data.accel_z, box_az),
                 ] {
                     let mut buf = String::<16>::new();
                     write!(&mut buf, "{reading:.2}").unwrap();
