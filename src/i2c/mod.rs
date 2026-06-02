@@ -1,5 +1,8 @@
-pub mod scan;
+mod blocking_wrapper;
 mod tca9548a;
+
+pub mod scan;
+pub use blocking_wrapper::BlockingI2cDeviceWrapper;
 
 use crate::resources::I2cResources;
 use embassy_sync::mutex::Mutex;

@@ -1,8 +1,7 @@
+use super::SharedI2cBus;
 use core::marker::ConstParamTy;
 use defmt::{Format, debug};
 use embedded_hal_async::i2c::{ErrorType, I2c, Operation};
-
-use super::SharedI2cBus;
 
 #[derive(Format, ConstParamTy, PartialEq, Eq)]
 #[repr(u8)]
