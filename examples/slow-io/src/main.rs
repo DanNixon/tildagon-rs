@@ -1,0 +1,160 @@
+#![no_std]
+#![no_main]
+#![deny(
+    clippy::mem_forget,
+    reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
+    holding buffers for the duration of a data transfer."
+)]
+
+use embassy_executor::Spawner;
+use embassy_time::Timer;
+use embedded_hal::pwm::SetDutyCycle;
+use panic_rtt_target as _;
+use static_cell::StaticCell;
+use tildagon::{
+    esp_hal::{self, clock::CpuClock, rmt::Rmt, time::Rate, timer::timg::TimerGroup},
+    hexpansion_slots::{HexpansionSlot, HexpansionSlotControl},
+    i2c::{SharedI2cBus, SharedI2cDevice},
+    imu::I2cDevice,
+    leds::Leds,
+    pins::{PinControl, async_digital::OutputPin},
+    resources::*,
+};
+
+extern crate alloc;
+
+// This creates a default app-descriptor required by the esp-idf bootloader.
+// For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
+esp_bootloader_esp_idf::esp_app_desc!();
+
+#[esp_rtos::main]
+async fn main(_spawner: Spawner) {
+    rtt_target::rtt_init_defmt!();
+
+    let config = tildagon::esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let p = tildagon::esp_hal::init(config);
+    let r = tildagon::split_resources!(p);
+
+    esp_alloc::heap_allocator!(size: 64 * 1024);
+    // COEX needs more RAM - so we've added some more
+    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+
+    let timg0 = TimerGroup::new(p.TIMG0);
+    esp_rtos::start(timg0.timer0);
+
+    static I2C_BUS: StaticCell<SharedI2cBus<tildagon::i2c::I2c>> = StaticCell::new();
+    let (bus, _reset) = tildagon::i2c::i2c_bus(r.i2c).await;
+    let i2c_bus = I2C_BUS.init(bus);
+
+    static I2C_SYSTEM: StaticCell<SharedI2cBus<tildagon::i2c::SystemI2cBus>> = StaticCell::new();
+    let i2c_system = I2C_SYSTEM.init(tildagon::i2c::system_i2c_bus(i2c_bus));
+
+    let mut pin_control = PinControl::new(i2c_system);
+    // pin_control.reset().unwrap();
+    pin_control.init().await.unwrap();
+    let pins = pin_control.pins();
+
+    let mut usb_sel = pins
+        .other
+        .usb_select
+        .into_output(SharedI2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+    usb_sel.set_low().await.unwrap();
+
+    let mut hex_slots =
+        HexpansionSlotControl::try_new(SharedI2cDevice::new(i2c_system), pins.hexpansion_detect)
+            .await
+            .unwrap();
+
+    let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
+
+    static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
+    let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
+
+    let mut leds = Leds::try_new(
+        SharedI2cDevice::new(i2c_system),
+        pins.led,
+        r.led,
+        rmt.channel0,
+        rmt_buffer,
+    )
+    .await
+    .unwrap();
+    leds.set_power(true).await.unwrap();
+    leds.intensity = 32;
+
+    // A little time for other tasks to start.
+    // Hacky as all fuck but good enough for a demo.
+    // Use channels to indicate readiness properly, mkay.
+    Timer::after_millis(500).await;
+
+    hex_slots
+        .set_enabled(HexpansionSlot::A, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::B, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::C, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::D, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::E, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::F, true)
+        .await
+        .unwrap();
+
+    let hex_a_pins = pins.hexpansion_a;
+
+    let mut a1 = hex_a_pins
+        .ls_1
+        .into_led(I2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+    let mut a2 = hex_a_pins
+        .ls_2
+        .into_led(I2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+    let mut a3 = hex_a_pins
+        .ls_3
+        .into_led(I2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+    let mut a4 = hex_a_pins
+        .ls_4
+        .into_led(I2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+    let mut a5 = hex_a_pins
+        .ls_5
+        .into_led(I2cDevice::new(i2c_system))
+        .await
+        .unwrap();
+
+    loop {
+        ramp(&mut a1).await;
+        ramp(&mut a2).await;
+        ramp(&mut a3).await;
+        ramp(&mut a4).await;
+        ramp(&mut a5).await;
+    }
+}
+
+async fn ramp<T: SetDutyCycle>(io: &mut T) {
+    for pct in 0..100 {
+        io.set_duty_cycle(pct).unwrap();
+        Timer::after_millis(10).await;
+    }
+    io.set_duty_cycle(0).unwrap();
+}
