@@ -1,41 +1,25 @@
-use crate::pins::{
-    ButtonPins, InputRegisters,
-    aw9523b::{GpioDirection, PinMode, set_io_direction, set_pin_mode},
-};
+use crate::pins::ButtonPins;
 use defmt::{Format, debug};
 use embassy_time::{Duration, Instant};
+use embedded_aw9523::InputRegisters;
+use embedded_hal::digital::PinState;
 use getset::Getters;
 use heapless::Vec;
 
 const BUTTON_COUNT: usize = 6;
 
-pub struct Buttons {
-    pins: ButtonPins,
+pub struct Buttons<I2C> {
+    pins: ButtonPins<I2C>,
     state: [Option<TemporalButtonState>; BUTTON_COUNT],
 }
 
-impl Buttons {
-    pub async fn try_new<I2C, E>(mut i2c: I2C, pins: ButtonPins) -> Result<Self, E>
-    where
-        I2C: embedded_hal_async::i2c::I2c<Error = E>,
-    {
-        macro_rules! setup_button {
-            ($bus:expr, $pin:expr) => {
-                set_pin_mode($bus, &$pin, PinMode::Gpio).await?;
-                set_io_direction($bus, &$pin, GpioDirection::Input).await?;
-            };
-        }
-
-        setup_button!(&mut i2c, pins.btn1);
-        setup_button!(&mut i2c, pins.btn2);
-        setup_button!(&mut i2c, pins.btn3);
-        setup_button!(&mut i2c, pins.btn4);
-        setup_button!(&mut i2c, pins.btn5);
-        setup_button!(&mut i2c, pins.btn6);
-
+impl<I2C, E> Buttons<I2C>
+where
+    I2C: embedded_hal_async::i2c::I2c<Error = E>,
+{
+    pub fn new(pins: ButtonPins<I2C>) -> Self {
         let state = [None; BUTTON_COUNT];
-
-        Ok(Self { pins, state })
+        Self { pins, state }
     }
 
     pub fn update(&mut self, regs: &InputRegisters) -> Vec<ButtonEvent, BUTTON_COUNT> {
@@ -137,7 +121,10 @@ pub enum ButtonState {
     Released,
 }
 
-fn states_from_registers(pins: &ButtonPins, regs: &InputRegisters) -> [ButtonState; BUTTON_COUNT] {
+fn states_from_registers<I2C>(
+    pins: &ButtonPins<I2C>,
+    regs: &InputRegisters,
+) -> [ButtonState; BUTTON_COUNT] {
     [
         regs.pin_state(&pins.btn1),
         regs.pin_state(&pins.btn2),
@@ -146,11 +133,8 @@ fn states_from_registers(pins: &ButtonPins, regs: &InputRegisters) -> [ButtonSta
         regs.pin_state(&pins.btn5),
         regs.pin_state(&pins.btn6),
     ]
-    .map(|high| {
-        if high {
-            ButtonState::Released
-        } else {
-            ButtonState::Pressed
-        }
+    .map(|state| match state.unwrap() {
+        PinState::Low => ButtonState::Pressed,
+        PinState::High => ButtonState::Released,
     })
 }
