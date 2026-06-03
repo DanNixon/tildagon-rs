@@ -4,7 +4,7 @@ use embedded_hal_async::{
     spi::{SpiBus, SpiDevice},
 };
 use embedded_hal_bus::spi::DeviceError;
-use tildagon::pins::async_digital::OutputPin;
+use tildagon::pins::embedded_aw9523::async_traits::digital::OutputPin;
 
 /// [`SpiDevice`] implementation with exclusive access to the bus (not shared).
 ///

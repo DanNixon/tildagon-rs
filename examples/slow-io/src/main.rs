@@ -14,10 +14,12 @@ use static_cell::StaticCell;
 use tildagon::{
     esp_hal::{self, clock::CpuClock, rmt::Rmt, time::Rate, timer::timg::TimerGroup},
     hexpansion_slots::{HexpansionSlot, HexpansionSlotControl},
-    i2c::{SharedI2cBus, SharedI2cDevice},
-    imu::I2cDevice,
+    i2c::SharedI2cBus,
     leds::Leds,
-    pins::{PinControl, async_digital::OutputPin},
+    pins::{
+        PinControl,
+        embedded_aw9523::{PinConfiguration, async_traits::digital::OutputPin},
+    },
     resources::*,
 };
 
@@ -49,38 +51,22 @@ async fn main(_spawner: Spawner) {
     static I2C_SYSTEM: StaticCell<SharedI2cBus<tildagon::i2c::SystemI2cBus>> = StaticCell::new();
     let i2c_system = I2C_SYSTEM.init(tildagon::i2c::system_i2c_bus(i2c_bus));
 
-    let mut pin_control = PinControl::new(i2c_system);
-    // pin_control.reset().unwrap();
-    pin_control.init().await.unwrap();
+    let mut pin_control = PinControl::new(i2c_system).await.unwrap();
     let pins = pin_control.pins();
 
-    let mut usb_sel = pins
-        .other
-        .usb_select
-        .into_output(SharedI2cDevice::new(i2c_system))
-        .await
-        .unwrap();
+    let mut usb_sel = pins.other.usb_select;
     usb_sel.set_low().await.unwrap();
 
-    let mut hex_slots =
-        HexpansionSlotControl::try_new(SharedI2cDevice::new(i2c_system), pins.hexpansion_detect)
-            .await
-            .unwrap();
+    let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
+        .await
+        .unwrap();
 
     let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
     static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
     let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
 
-    let mut leds = Leds::try_new(
-        SharedI2cDevice::new(i2c_system),
-        pins.led,
-        r.led,
-        rmt.channel0,
-        rmt_buffer,
-    )
-    .await
-    .unwrap();
+    let mut leds = Leds::new(pins.led, r.led, rmt.channel0, rmt_buffer);
     leds.set_power(true).await.unwrap();
     leds.intensity = 32;
 
@@ -116,31 +102,11 @@ async fn main(_spawner: Spawner) {
 
     let hex_a_pins = pins.hexpansion_a;
 
-    let mut a1 = hex_a_pins
-        .ls_1
-        .into_led(I2cDevice::new(i2c_system))
-        .await
-        .unwrap();
-    let mut a2 = hex_a_pins
-        .ls_2
-        .into_led(I2cDevice::new(i2c_system))
-        .await
-        .unwrap();
-    let mut a3 = hex_a_pins
-        .ls_3
-        .into_led(I2cDevice::new(i2c_system))
-        .await
-        .unwrap();
-    let mut a4 = hex_a_pins
-        .ls_4
-        .into_led(I2cDevice::new(i2c_system))
-        .await
-        .unwrap();
-    let mut a5 = hex_a_pins
-        .ls_5
-        .into_led(I2cDevice::new(i2c_system))
-        .await
-        .unwrap();
+    let mut a1 = hex_a_pins.ls_1.try_into_led().await.unwrap();
+    let mut a2 = hex_a_pins.ls_2.try_into_led().await.unwrap();
+    let mut a3 = hex_a_pins.ls_3.try_into_led().await.unwrap();
+    let mut a4 = hex_a_pins.ls_4.try_into_led().await.unwrap();
+    let mut a5 = hex_a_pins.ls_5.try_into_led().await.unwrap();
 
     loop {
         ramp(&mut a1).await;

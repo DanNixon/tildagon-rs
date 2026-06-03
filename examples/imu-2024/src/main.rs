@@ -42,7 +42,7 @@ use tildagon::{
     i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
     imu::bmi2::types::{Data, PwrCtrl},
     leds::Leds,
-    pins::{PinControl, async_digital::OutputPin},
+    pins::{PinControl, embedded_aw9523::async_traits::digital::OutputPin},
     resources::*,
 };
 
@@ -74,37 +74,20 @@ async fn main(spawner: Spawner) {
     static I2C_SYSTEM: StaticCell<SharedI2cBus<tildagon::i2c::SystemI2cBus>> = StaticCell::new();
     let i2c_system = I2C_SYSTEM.init(tildagon::i2c::system_i2c_bus(i2c_bus));
 
-    let mut pin_control = PinControl::new(i2c_system);
-    // pin_control.reset().unwrap();
-    pin_control.init().await.unwrap();
+    let mut pin_control = PinControl::new(i2c_system).await.unwrap();
     let pins = pin_control.pins();
 
-    let mut usb_sel = pins
-        .other
-        .usb_select
-        .into_output(SharedI2cDevice::new(i2c_system))
-        .await
-        .unwrap();
+    let mut usb_sel = pins.other.usb_select;
     usb_sel.set_low().await.unwrap();
 
-    let mut buttons = Buttons::try_new(SharedI2cDevice::new(i2c_system), pins.button)
-        .await
-        .unwrap();
+    let mut buttons = Buttons::new(pins.buttons);
 
     let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
     static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
     let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
 
-    let mut leds = Leds::try_new(
-        SharedI2cDevice::new(i2c_system),
-        pins.led,
-        r.led,
-        rmt.channel0,
-        rmt_buffer,
-    )
-    .await
-    .unwrap();
+    let mut leds = Leds::new(pins.led, r.led, rmt.channel0, rmt_buffer);
     leds.set_power(true).await.unwrap();
 
     let mut imu = tildagon::imu::init(SharedI2cDevice::new(i2c_system))
@@ -150,7 +133,7 @@ async fn main(spawner: Spawner) {
     loop {
         match select(io_tick.next(), imu_tick.next()).await {
             Either::First(_) => {
-                let regs = pin_control.read_input_registers().await.unwrap();
+                let regs = pin_control.read_system_bus_input_registers().await.unwrap();
 
                 for event in buttons.update(&regs) {
                     info!("Button event: {}", event);

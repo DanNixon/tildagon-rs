@@ -1,7 +1,8 @@
 #[cfg(not(feature = "top-board-none"))]
 use crate::hexpansion_slots::HexpansionSlot;
-use crate::{pins::LedPins, pins::async_digital::OutputPin, resources::LedResources};
+use crate::{pins::LedPins, resources::LedResources};
 use defmt::Format;
+use embedded_aw9523::{Output, async_traits::digital::OutputPin};
 use embedded_hal::digital::{ErrorKind, PinState};
 use esp_hal::{
     Blocking,
@@ -19,7 +20,7 @@ pub fn make_rmt_buffer() -> RmtBuffer {
 }
 
 pub struct Leds<'ch, I2C> {
-    led_power: crate::pins::OutputPin<I2C>,
+    led_power: Output<I2C>,
 
     leds: SmartLedsAdapter<'ch, RMT_BUFFER_SIZE>,
 
@@ -31,21 +32,20 @@ impl<'ch, I2C, E> Leds<'ch, I2C>
 where
     I2C: embedded_hal_async::i2c::I2c<Error = E>,
 {
-    pub async fn try_new(
-        i2c: I2C,
-        pins: LedPins,
+    pub fn new(
+        pins: LedPins<I2C>,
         r: LedResources<'static>,
         rmt_ch: ChannelCreator<'static, Blocking, 0>,
         rmt_buffer: &'ch mut [PulseCode; RMT_BUFFER_SIZE],
-    ) -> Result<Self, E> {
+    ) -> Self {
         let leds = SmartLedsAdapter::new(rmt_ch, r.data, rmt_buffer);
 
-        Ok(Self {
-            led_power: pins.power_enable.into_output(i2c).await?,
+        Self {
+            led_power: pins.power_enable,
             leds,
             intensity: 255,
             pixels: [RGB8::default(); LED_COUNT],
-        })
+        }
     }
 
     pub async fn set_power(&mut self, on: bool) -> Result<(), ErrorKind> {
