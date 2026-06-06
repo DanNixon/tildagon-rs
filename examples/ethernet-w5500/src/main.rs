@@ -7,7 +7,6 @@
 )]
 
 mod display;
-mod exclusive_device;
 mod fake_pin;
 mod leds;
 mod wall_time;
@@ -17,7 +16,7 @@ use embassy_executor::Spawner;
 use embassy_net::StackResources;
 use embassy_net_wiznet::{Device, Runner, State, chip::W5500};
 use embassy_time::Timer;
-use exclusive_device::ExclusiveDevice;
+use embedded_hal_bus::spi::ExclusiveDevice;
 use fake_pin::FakePin;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
@@ -136,9 +135,7 @@ async fn main(spawner: Spawner) {
     w5500_reset.set_high().await.unwrap();
     Timer::after_millis(100).await;
 
-    let w5500_spi_dev = ExclusiveDevice::new(spi, cs, embassy_time::Delay)
-        .await
-        .unwrap();
+    let w5500_spi_dev = ExclusiveDevice::new(spi, cs, embassy_time::Delay).unwrap();
 
     let mac_addr = [0x02, 0x00, 0x00, 0x00, 0x00, 0x00];
     static STATE: StaticCell<State<8, 8>> = StaticCell::new();
