@@ -110,7 +110,7 @@ async fn main(spawner: Spawner) {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
-                spawner.must_spawn(display_task(r.top_board, r.display));
+                spawner.must_spawn(display_task(r.top_board, p.SPI2, p.DMA_CH0));
             });
         },
     );
@@ -169,9 +169,9 @@ static HEX_CONTROL_CHANNEL: PubSubChannel<CriticalSectionRawMutex, HexpansionCon
     PubSubChannel::new();
 
 #[embassy_executor::task]
-async fn display_task(top_board: TopBoardResources<'static>, display: DisplayResources<'static>) {
+async fn display_task(top_board: TopBoardResources<'static>, spi: SPI0, dma: DMA_CH0) {
     let mut display_buffer = [0_u8; 512];
-    let mut display = tildagon::display::init(top_board, display, &mut display_buffer);
+    let mut display = tildagon::display::init(top_board, spi, dma, &mut display_buffer);
     display.clear(Rgb565::BLACK).unwrap();
 
     let mut event_sub = EVENT_CHANNEL.subscriber().unwrap();

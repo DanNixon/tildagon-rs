@@ -54,7 +54,6 @@ where
     }
 }
 
-#[cfg(feature = "top-board-2024")]
 #[derive(Debug, Format, PartialEq, Eq, Clone, Copy)]
 pub enum Button {
     A,
@@ -65,7 +64,6 @@ pub enum Button {
     F,
 }
 
-#[cfg(feature = "top-board-2024")]
 impl Button {
     fn from_index(index: usize) -> Self {
         match index {

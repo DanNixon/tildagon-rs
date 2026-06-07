@@ -17,7 +17,6 @@ use mipidsi::{
     options::{ColorInversion, ColorOrder, Orientation, Rotation},
 };
 
-#[cfg(feature = "top-board-2024")]
 type Display<'a> = mipidsi::Display<
     SpiInterface<
         'a,
@@ -28,8 +27,10 @@ type Display<'a> = mipidsi::Display<
     NoResetPin,
 >;
 
-pub fn init<'a>(
+pub fn init<'a, SPI, DMA>(
     top_board: TopBoardResources<'static>,
+    spi: SPI,
+    dma: DMA,
     display: DisplayResources<'static>,
     buffer: &'a mut [u8],
 ) -> Display<'a> {
@@ -40,7 +41,7 @@ pub fn init<'a>(
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let spi = Spi::new(
-        display.spi,
+        spi,
         Config::default()
             .with_frequency(Rate::from_mhz(80))
             .with_mode(Mode::_0),
@@ -48,7 +49,7 @@ pub fn init<'a>(
     .unwrap()
     .with_sck(top_board.hs_1)
     .with_mosi(top_board.hs_2)
-    .with_dma(display.dma)
+    .with_dma(dma)
     .with_buffers(dma_rx_buf, dma_tx_buf);
 
     let cs = Output::new(top_board.hs_4, Level::High, Default::default());
