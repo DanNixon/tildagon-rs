@@ -19,13 +19,6 @@ Still quite early in development and things might change a bit, but very usable 
 - [ ] Hexpansion metadata read(/write)
 - [ ] Some form of dynamic hexpansion slot use
 
-## Cargo features
-
-- `top-board-none`: no support for any devices on the top board flat flex connection
-- `top-board-2024`: support for the devices on the top board from EMF 2024
-
-You will need to enable exactly one `top-board-*` feature.
-
 ## Development setup
 
 Assumes using Nix dev shell and [Distrobox](https://distrobox.it/).
