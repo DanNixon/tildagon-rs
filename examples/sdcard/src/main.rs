@@ -112,23 +112,11 @@ async fn main(_spawner: Spawner) {
         .await
         .unwrap();
 
-    let mut card_detect_1 = hex_a_slow
-        .ls_1
-        .into_input(SharedI2cDevice::new(i2c_system))
-        .await
-        .unwrap();
-    let mut card_detect_2 = hex_a_slow
-        .ls_4
-        .into_input(SharedI2cDevice::new(i2c_system))
-        .await
-        .unwrap();
+    let mut card_detect_1 = hex_a_slow.ls_1.into_input().await.unwrap();
+    let mut card_detect_2 = hex_a_slow.ls_4.into_input().await.unwrap();
 
-    let mut cs_2 = hex_a_slow
-        .ls_5
-        .into_output(SharedI2cDevice::new(i2c_system))
-        .await
-        .unwrap();
-    cs_2.set_high().await.unwrap();
+    let cs_1 = Output::new(hex_a_fast.hs_1, Level::High, Default::default());
+    let cs_2 = hex_a_slow.ls_5.into_output().await.unwrap();
 
     let dma_channel = p.DMA_CH1;
 
@@ -149,14 +137,13 @@ async fn main(_spawner: Spawner) {
     .with_dma(dma_channel)
     .with_buffers(dma_rx_buf, dma_tx_buf);
 
-    let cs = Output::new(hex_a_fast.hs_1, Level::High, Default::default());
-
     let dev = ExclusiveDevice::new(spi, cs, Delay).unwrap();
     let sdcard = embedded_sdmmc::SdCard::new(dev, Delay);
 
     loop {
         info!("Card 1 detect: {}", card_detect_1.is_low().await);
         info!("Card 2 detect: {}", card_detect_2.is_low().await);
+
         info!("Card type {}", sdcard.get_card_type());
         info!("Card size is {} bytes", sdcard.num_bytes().unwrap());
 
