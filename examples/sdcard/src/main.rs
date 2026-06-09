@@ -104,7 +104,8 @@ async fn main(_spawner: Spawner) {
     let mut card_detect_2 = hex_a_slow.ls_4.try_into_input().await.unwrap();
 
     let cs_1 = Output::new(hex_a_fast.hs_1, Level::High, Default::default());
-    let cs_2 = hex_a_slow.ls_5.try_into_output().await.unwrap();
+    let mut cs_2 = hex_a_slow.ls_5.try_into_output().await.unwrap();
+    cs_2.set_high().await.unwrap();
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
