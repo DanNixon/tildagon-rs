@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.6](https://github.com/DanNixon/tildagon-rs/compare/v0.0.5...v0.0.6) - 2026-06-09
+
+### Added
+
+- [**breaking**] use embedded_aw9523
+- re-export bmi2 from tildagon-rs
+- use blocking i2c wrapper and upstream crate for IMU
+- add blocking i2c wrapper
+- add slow IO example
+- add blocking embedded_hal implementations for slow pins
+- add ethernet hexpansion demo
+
+### Other
+
+- remove custom `ExclusiveDevice` in Ethernet demo
+- use upstream assign_resources macro
+
 ## [0.0.5](https://github.com/DanNixon/tildagon-rs/compare/v0.0.4...v0.0.5) - 2026-04-07
 
 ### Added
