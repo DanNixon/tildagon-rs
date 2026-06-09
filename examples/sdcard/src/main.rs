@@ -125,7 +125,8 @@ async fn main(_spawner: Spawner) {
 
     let spi = NoopMutex::new(RefCell::new(spi));
 
-    const SPI: StaticCell<NoopMutex<RefCell<SpiDmaBus<esp_hal::Blocking>>>> = StaticCell::new();
+    const SPI: StaticCell<NoopMutex<RefCell<SpiDmaBus<'static, esp_hal::Blocking>>>> =
+        StaticCell::new();
 
     let spi = SPI.init(spi);
 
