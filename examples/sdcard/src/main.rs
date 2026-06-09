@@ -8,9 +8,11 @@
 
 use core::cell::RefCell;
 use defmt::info;
+use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_executor::Spawner;
 use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Delay, Timer};
+use embedded_sdmmc::SdCard;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
@@ -104,8 +106,6 @@ async fn main(_spawner: Spawner) {
     let cs_1 = Output::new(hex_a_fast.hs_1, Level::High, Default::default());
     let cs_2 = hex_a_slow.ls_5.try_into_output().await.unwrap();
 
-    let dma_channel = p.DMA_CH1;
-
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
@@ -120,21 +120,15 @@ async fn main(_spawner: Spawner) {
     .with_sck(hex_a_fast.hs_3)
     .with_mosi(hex_a_fast.hs_2)
     .with_miso(hex_a_fast.hs_4)
-    .with_dma(dma_channel)
+    .with_dma(p.DMA_CH1)
     .with_buffers(dma_rx_buf, dma_tx_buf);
 
-    let spi = NoopMutex::new(RefCell::new(spi));
-
-    const SPI: StaticCell<NoopMutex<RefCell<SpiDmaBus<'static, esp_hal::Blocking>>>> =
+    static SPI: StaticCell<NoopMutex<RefCell<SpiDmaBus<'static, esp_hal::Blocking>>>> =
         StaticCell::new();
+    let spi = SPI.init(NoopMutex::new(RefCell::new(spi)));
 
-    let spi = SPI.init(spi);
-
-    let dev_1 = embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice::new(spi, cs_1);
-    let dev_2 = embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice::new(spi, cs_2);
-
-    let sdcard_1 = embedded_sdmmc::SdCard::new(dev_1, Delay);
-    let sdcard_2 = embedded_sdmmc::SdCard::new(dev_2, Delay);
+    let sdcard_1 = SdCard::new(SpiDevice::new(spi, cs_1), Delay);
+    let sdcard_2 = SdCard::new(SpiDevice::new(spi, cs_2), Delay);
 
     loop {
         info!("Card 1 detect: {}", card_detect_1.is_low().await);
