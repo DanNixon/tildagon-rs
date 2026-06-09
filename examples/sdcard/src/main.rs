@@ -6,10 +6,11 @@
     holding buffers for the duration of a data transfer."
 )]
 
+use core::cell::RefCell;
 use defmt::info;
 use embassy_executor::Spawner;
+use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Delay, Timer};
-use embedded_hal_bus::spi::ExclusiveDevice;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
@@ -23,17 +24,20 @@ use tildagon::{
         rmt::Rmt,
         spi::{
             Mode,
-            master::{Config, Spi},
+            master::{Config, Spi, SpiDmaBus},
         },
         time::Rate,
         timer::timg::TimerGroup,
     },
     hexpansion_slots::{HexpansionSlot, HexpansionSlotControl},
-    i2c::{SharedI2cBus, SharedI2cDevice},
+    i2c::SharedI2cBus,
     leds::Leds,
     pins::{
         PinControl,
-        async_digital::{InputPin, OutputPin},
+        embedded_aw9523::{
+            PinConfiguration,
+            async_traits::digital::{InputPin, OutputPin},
+        },
     },
     resources::*,
 };
@@ -66,42 +70,24 @@ async fn main(_spawner: Spawner) {
     static I2C_SYSTEM: StaticCell<SharedI2cBus<tildagon::i2c::SystemI2cBus>> = StaticCell::new();
     let i2c_system = I2C_SYSTEM.init(tildagon::i2c::system_i2c_bus(i2c_bus));
 
-    let mut pin_control = PinControl::new(i2c_system);
-    // pin_control.reset().unwrap();
-    pin_control.init().await.unwrap();
+    let mut pin_control = PinControl::new(i2c_system).await.unwrap();
     let pins = pin_control.pins();
 
-    let mut usb_sel = pins
-        .other
-        .usb_select
-        .into_output(SharedI2cDevice::new(i2c_system))
-        .await
-        .unwrap();
+    let mut usb_sel = pins.other.usb_select;
     usb_sel.set_low().await.unwrap();
 
-    let _buttons = Buttons::try_new(SharedI2cDevice::new(i2c_system), pins.button)
+    let _buttons = Buttons::new(pins.buttons);
+
+    let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
         .await
         .unwrap();
-
-    let mut hex_slots =
-        HexpansionSlotControl::try_new(SharedI2cDevice::new(i2c_system), pins.hexpansion_detect)
-            .await
-            .unwrap();
 
     let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
     static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
     let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
 
-    let mut leds = Leds::try_new(
-        SharedI2cDevice::new(i2c_system),
-        pins.led,
-        r.led,
-        rmt.channel0,
-        rmt_buffer,
-    )
-    .await
-    .unwrap();
+    let mut leds = Leds::new(pins.led, r.led, rmt.channel0, rmt_buffer);
     leds.set_power(true).await.unwrap();
 
     let hex_a_fast = r.hexpansion_a;
@@ -112,11 +98,11 @@ async fn main(_spawner: Spawner) {
         .await
         .unwrap();
 
-    let mut card_detect_1 = hex_a_slow.ls_1.into_input().await.unwrap();
-    let mut card_detect_2 = hex_a_slow.ls_4.into_input().await.unwrap();
+    let mut card_detect_1 = hex_a_slow.ls_1.try_into_input().await.unwrap();
+    let mut card_detect_2 = hex_a_slow.ls_4.try_into_input().await.unwrap();
 
     let cs_1 = Output::new(hex_a_fast.hs_1, Level::High, Default::default());
-    let cs_2 = hex_a_slow.ls_5.into_output().await.unwrap();
+    let cs_2 = hex_a_slow.ls_5.try_into_output().await.unwrap();
 
     let dma_channel = p.DMA_CH1;
 
@@ -137,15 +123,27 @@ async fn main(_spawner: Spawner) {
     .with_dma(dma_channel)
     .with_buffers(dma_rx_buf, dma_tx_buf);
 
-    let dev = ExclusiveDevice::new(spi, cs, Delay).unwrap();
-    let sdcard = embedded_sdmmc::SdCard::new(dev, Delay);
+    let spi = NoopMutex::new(RefCell::new(spi));
+
+    const SPI: StaticCell<NoopMutex<RefCell<SpiDmaBus<esp_hal::Blocking>>>> = StaticCell::new();
+
+    let spi = SPI.init(spi);
+
+    let dev_1 = embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice::new(spi, cs_1);
+    let dev_2 = embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice::new(spi, cs_2);
+
+    let sdcard_1 = embedded_sdmmc::SdCard::new(dev_1, Delay);
+    let sdcard_2 = embedded_sdmmc::SdCard::new(dev_2, Delay);
 
     loop {
         info!("Card 1 detect: {}", card_detect_1.is_low().await);
         info!("Card 2 detect: {}", card_detect_2.is_low().await);
 
-        info!("Card type {}", sdcard.get_card_type());
-        info!("Card size is {} bytes", sdcard.num_bytes().unwrap());
+        info!("Card 1 type {}", sdcard_1.get_card_type());
+        info!("Card 1 size is {} bytes", sdcard_1.num_bytes().unwrap());
+
+        info!("Card 2 type {}", sdcard_2.get_card_type());
+        info!("Card 2 size is {} bytes", sdcard_2.num_bytes().unwrap());
 
         Timer::after_secs(2).await;
     }
