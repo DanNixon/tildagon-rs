@@ -6,5 +6,6 @@ workspace-lsp-roots = [
   "./examples/ethernet-w5500",
   "./examples/i2c-scan",
   "./examples/imu-2024",
+  "./examples/sdcard",
   "./examples/slow-io",
 ]
