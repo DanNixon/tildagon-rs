@@ -6,9 +6,6 @@
     holding buffers for the duration of a data transfer."
 )]
 
-mod exclusive_device;
-mod fake_pin;
-
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::{Delay, Timer};
