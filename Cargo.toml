@@ -18,6 +18,7 @@ top-board-2024 = []
 
 [dependencies]
 bmi2 = "0.1.2"
+bq25895 = "0.0.3"
 defmt = "1.0.1"
 embassy-embedded-hal = { version = "0.6.0", features = ["defmt"] }
 embassy-futures = "0.1.2"

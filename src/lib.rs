@@ -17,6 +17,7 @@ pub mod display;
 pub mod leds;
 
 // Re-exports
+pub use bq25895;
 pub use esp_hal;
 
 #[cfg(not(any(feature = "top-board-none", feature = "top-board-2024")))]
