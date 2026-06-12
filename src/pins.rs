@@ -1,8 +1,6 @@
 use crate::i2c::{SharedI2cDevice, SharingRawMutex, SystemI2cBus};
 use embassy_sync::mutex::Mutex;
-use embedded_aw9523::{
-    Address, Aw9523, Input, InputRegisters, Output, PinConfiguration, UnconfiguredPin,
-};
+use embedded_aw9523::{Address, Aw9523, Input, InputRegisters, Output, PinConfiguration};
 
 pub use embedded_aw9523;
 
@@ -87,16 +85,16 @@ where
                 power_enable: addr5a_pins.port0_pin2.try_into_output().await?,
             },
             top_board: TopBoardPins {
-                ls_1: addr5a_pins.port1_pin7,
-                ls_2: addr5a_pins.port1_pin6,
+                ls_1: addr5a_pins.port1_pin7.try_into_input().await?,
+                ls_2: addr5a_pins.port1_pin6.try_into_input().await?,
             },
             hexpansion_detect: HexpansionDetectPins {
-                a: addr5a_pins.port1_pin4,
-                b: addr5a_pins.port1_pin5,
-                c: addr59_pins.port1_pin0,
-                d: addr59_pins.port1_pin1,
-                e: addr59_pins.port1_pin2,
-                f: addr59_pins.port1_pin3,
+                a: addr5a_pins.port1_pin4.try_into_output().await?,
+                b: addr5a_pins.port1_pin5.try_into_output().await?,
+                c: addr59_pins.port1_pin0.try_into_output().await?,
+                d: addr59_pins.port1_pin1.try_into_output().await?,
+                e: addr59_pins.port1_pin2.try_into_output().await?,
+                f: addr59_pins.port1_pin3.try_into_output().await?,
             },
             buttons: ButtonPins {
                 btn1: addr5a_pins.port0_pin6.try_into_input().await?,
@@ -107,46 +105,46 @@ where
                 btn6: addr59_pins.port0_pin3.try_into_input().await?,
             },
             hexpansion_a: HexpansionAPins {
-                ls_1: addr5a_pins.port0_pin3,
-                ls_2: addr5a_pins.port1_pin0,
-                ls_3: addr5a_pins.port1_pin1,
-                ls_4: addr5a_pins.port1_pin2,
-                ls_5: addr5a_pins.port1_pin3,
+                ls_1: addr5a_pins.port0_pin3.try_into_input().await?,
+                ls_2: addr5a_pins.port1_pin0.try_into_input().await?,
+                ls_3: addr5a_pins.port1_pin1.try_into_input().await?,
+                ls_4: addr5a_pins.port1_pin2.try_into_input().await?,
+                ls_5: addr5a_pins.port1_pin3.try_into_input().await?,
             },
             hexpansion_b: HexpansionBPins {
-                ls_1: addr5a_pins.port0_pin0,
-                ls_2: addr5a_pins.port0_pin1,
-                ls_3: addr59_pins.port1_pin5,
-                ls_4: addr59_pins.port1_pin6,
-                ls_5: addr59_pins.port1_pin7,
+                ls_1: addr5a_pins.port0_pin0.try_into_input().await?,
+                ls_2: addr5a_pins.port0_pin1.try_into_input().await?,
+                ls_3: addr59_pins.port1_pin5.try_into_input().await?,
+                ls_4: addr59_pins.port1_pin6.try_into_input().await?,
+                ls_5: addr59_pins.port1_pin7.try_into_input().await?,
             },
             hexpansion_c: HexpansionCPins {
-                ls_1: addr59_pins.port0_pin4,
-                ls_2: addr59_pins.port0_pin5,
-                ls_3: addr59_pins.port0_pin6,
-                ls_4: addr59_pins.port0_pin7,
-                ls_5: addr59_pins.port1_pin4,
+                ls_1: addr59_pins.port0_pin4.try_into_input().await?,
+                ls_2: addr59_pins.port0_pin5.try_into_input().await?,
+                ls_3: addr59_pins.port0_pin6.try_into_input().await?,
+                ls_4: addr59_pins.port0_pin7.try_into_input().await?,
+                ls_5: addr59_pins.port1_pin4.try_into_input().await?,
             },
             hexpansion_d: HexpansionDPins {
-                ls_1: addr58_pins.port1_pin0,
-                ls_2: addr58_pins.port1_pin1,
-                ls_3: addr58_pins.port1_pin2,
-                ls_4: addr58_pins.port1_pin3,
-                ls_5: addr58_pins.port0_pin0,
+                ls_1: addr58_pins.port1_pin0.try_into_input().await?,
+                ls_2: addr58_pins.port1_pin1.try_into_input().await?,
+                ls_3: addr58_pins.port1_pin2.try_into_input().await?,
+                ls_4: addr58_pins.port1_pin3.try_into_input().await?,
+                ls_5: addr58_pins.port0_pin0.try_into_input().await?,
             },
             hexpansion_e: HexpansionEPins {
-                ls_1: addr58_pins.port0_pin2,
-                ls_2: addr58_pins.port0_pin3,
-                ls_3: addr58_pins.port0_pin4,
-                ls_4: addr58_pins.port0_pin5,
-                ls_5: addr58_pins.port0_pin6,
+                ls_1: addr58_pins.port0_pin2.try_into_input().await?,
+                ls_2: addr58_pins.port0_pin3.try_into_input().await?,
+                ls_3: addr58_pins.port0_pin4.try_into_input().await?,
+                ls_4: addr58_pins.port0_pin5.try_into_input().await?,
+                ls_5: addr58_pins.port0_pin6.try_into_input().await?,
             },
             hexpansion_f: HexpansionFPins {
-                ls_1: addr58_pins.port0_pin7,
-                ls_2: addr58_pins.port1_pin4,
-                ls_3: addr58_pins.port1_pin5,
-                ls_4: addr58_pins.port1_pin6,
-                ls_5: addr58_pins.port1_pin7,
+                ls_1: addr58_pins.port0_pin7.try_into_input().await?,
+                ls_2: addr58_pins.port1_pin4.try_into_input().await?,
+                ls_3: addr58_pins.port1_pin5.try_into_input().await?,
+                ls_4: addr58_pins.port1_pin6.try_into_input().await?,
+                ls_5: addr58_pins.port1_pin7.try_into_input().await?,
             },
         })
     }
@@ -163,17 +161,17 @@ pub struct LedPins<SysI2C> {
 }
 
 pub struct TopBoardPins<SysI2C> {
-    pub ls_1: UnconfiguredPin<SysI2C>,
-    pub ls_2: UnconfiguredPin<SysI2C>,
+    pub ls_1: Input<SysI2C>,
+    pub ls_2: Input<SysI2C>,
 }
 
 pub struct HexpansionDetectPins<SysI2C> {
-    pub a: UnconfiguredPin<SysI2C>,
-    pub b: UnconfiguredPin<SysI2C>,
-    pub c: UnconfiguredPin<SysI2C>,
-    pub d: UnconfiguredPin<SysI2C>,
-    pub e: UnconfiguredPin<SysI2C>,
-    pub f: UnconfiguredPin<SysI2C>,
+    pub a: Output<SysI2C>,
+    pub b: Output<SysI2C>,
+    pub c: Output<SysI2C>,
+    pub d: Output<SysI2C>,
+    pub e: Output<SysI2C>,
+    pub f: Output<SysI2C>,
 }
 
 pub struct ButtonPins<SysI2C> {
@@ -186,49 +184,49 @@ pub struct ButtonPins<SysI2C> {
 }
 
 pub struct HexpansionAPins<SysI2C> {
-    pub ls_1: UnconfiguredPin<SysI2C>,
-    pub ls_2: UnconfiguredPin<SysI2C>,
-    pub ls_3: UnconfiguredPin<SysI2C>,
-    pub ls_4: UnconfiguredPin<SysI2C>,
-    pub ls_5: UnconfiguredPin<SysI2C>,
+    pub ls_1: Input<SysI2C>,
+    pub ls_2: Input<SysI2C>,
+    pub ls_3: Input<SysI2C>,
+    pub ls_4: Input<SysI2C>,
+    pub ls_5: Input<SysI2C>,
 }
 
 pub struct HexpansionBPins<SysI2C> {
-    pub ls_1: UnconfiguredPin<SysI2C>,
-    pub ls_2: UnconfiguredPin<SysI2C>,
-    pub ls_3: UnconfiguredPin<SysI2C>,
-    pub ls_4: UnconfiguredPin<SysI2C>,
-    pub ls_5: UnconfiguredPin<SysI2C>,
+    pub ls_1: Input<SysI2C>,
+    pub ls_2: Input<SysI2C>,
+    pub ls_3: Input<SysI2C>,
+    pub ls_4: Input<SysI2C>,
+    pub ls_5: Input<SysI2C>,
 }
 
 pub struct HexpansionCPins<SysI2C> {
-    pub ls_1: UnconfiguredPin<SysI2C>,
-    pub ls_2: UnconfiguredPin<SysI2C>,
-    pub ls_3: UnconfiguredPin<SysI2C>,
-    pub ls_4: UnconfiguredPin<SysI2C>,
-    pub ls_5: UnconfiguredPin<SysI2C>,
+    pub ls_1: Input<SysI2C>,
+    pub ls_2: Input<SysI2C>,
+    pub ls_3: Input<SysI2C>,
+    pub ls_4: Input<SysI2C>,
+    pub ls_5: Input<SysI2C>,
 }
 
 pub struct HexpansionDPins<SysI2C> {
-    pub ls_1: UnconfiguredPin<SysI2C>,
-    pub ls_2: UnconfiguredPin<SysI2C>,
-    pub ls_3: UnconfiguredPin<SysI2C>,
-    pub ls_4: UnconfiguredPin<SysI2C>,
-    pub ls_5: UnconfiguredPin<SysI2C>,
+    pub ls_1: Input<SysI2C>,
+    pub ls_2: Input<SysI2C>,
+    pub ls_3: Input<SysI2C>,
+    pub ls_4: Input<SysI2C>,
+    pub ls_5: Input<SysI2C>,
 }
 
 pub struct HexpansionEPins<SysI2C> {
-    pub ls_1: UnconfiguredPin<SysI2C>,
-    pub ls_2: UnconfiguredPin<SysI2C>,
-    pub ls_3: UnconfiguredPin<SysI2C>,
-    pub ls_4: UnconfiguredPin<SysI2C>,
-    pub ls_5: UnconfiguredPin<SysI2C>,
+    pub ls_1: Input<SysI2C>,
+    pub ls_2: Input<SysI2C>,
+    pub ls_3: Input<SysI2C>,
+    pub ls_4: Input<SysI2C>,
+    pub ls_5: Input<SysI2C>,
 }
 
 pub struct HexpansionFPins<SysI2C> {
-    pub ls_1: UnconfiguredPin<SysI2C>,
-    pub ls_2: UnconfiguredPin<SysI2C>,
-    pub ls_3: UnconfiguredPin<SysI2C>,
-    pub ls_4: UnconfiguredPin<SysI2C>,
-    pub ls_5: UnconfiguredPin<SysI2C>,
+    pub ls_1: Input<SysI2C>,
+    pub ls_2: Input<SysI2C>,
+    pub ls_3: Input<SysI2C>,
+    pub ls_4: Input<SysI2C>,
+    pub ls_5: Input<SysI2C>,
 }
