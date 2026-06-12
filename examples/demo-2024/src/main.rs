@@ -35,6 +35,7 @@ use smart_leds::{
 };
 use static_cell::StaticCell;
 use tildagon::{
+    bq25895::{self, Bq25895},
     buttons::{Button, ButtonEvent, ButtonState, Buttons},
     esp_hal::{
         self, clock::CpuClock, interrupt::software::SoftwareInterruptControl, rmt::Rmt,
@@ -115,6 +116,9 @@ async fn main(spawner: Spawner) {
         },
     );
 
+    let bq = tildagon::system::new_bq25895(i2c_system);
+    spawner.must_spawn(power_task(bq));
+
     spawner.must_spawn(led_task(leds));
     spawner.must_spawn(button_logic_task());
 
@@ -147,6 +151,33 @@ async fn main(spawner: Spawner) {
                 hex_slots.set_enabled(msg.slot, msg.enable).await.unwrap();
             }
         }
+    }
+}
+
+#[embassy_executor::task]
+async fn power_task(mut bq: Bq25895<bq25895::Interface<SharedI2cDevice<SystemI2cBus>>>) {
+    let mut tick = Ticker::every(Duration::from_millis(1000));
+
+    loop {
+        tick.next().await;
+
+        info!("Battery stats:");
+        let reg = bq.reg_0_b().read_async().await.unwrap();
+        info!("Vbus stat: {}", reg.vbus_stat().unwrap());
+        info!("Charging stat.: {}", reg.chrg_stat().unwrap());
+        info!("PG: {}", reg.pg_stat().unwrap());
+        let reg = bq.reg_11().read_async().await.unwrap();
+        info!("Vbus: {}", reg.vbusv().unwrap());
+        let reg = bq.reg_12().read_async().await.unwrap();
+        info!("Ichgr: {}", reg.ichgr().unwrap());
+        let reg = bq.reg_0_e().read_async().await.unwrap();
+        info!("Vbat: {}", reg.batv().unwrap());
+        let reg = bq.reg_00().read_async().await.unwrap();
+        info!("input current limit: {}", reg.iinlim().unwrap());
+        let reg = bq.reg_0_d().read_async().await.unwrap();
+        info!("vdpm: {}", reg.vindpm().unwrap());
+        let reg = bq.reg_10().read_async().await.unwrap();
+        info!("tsvpct: {}", reg.tspct().unwrap());
     }
 }
 
