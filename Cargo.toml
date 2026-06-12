@@ -23,7 +23,7 @@ embassy-embedded-hal = { version = "0.6.0", features = ["defmt"] }
 embassy-futures = "0.1.2"
 embassy-sync = { version = "0.8.0", features = ["defmt"] }
 embassy-time = { version = "0.5.1", features = ["defmt"] }
-embedded-aw9523 = "0.2.1"
+embedded-aw9523 = "0.3.0"
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
 embedded-hal-bus = { version = "0.3.0", default-features = false, features = ["async", "defmt-03"] }

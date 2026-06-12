@@ -14,9 +14,9 @@ impl PinControl {
         system_bus: &'static Mutex<SharingRawMutex, SystemI2cBus>,
     ) -> Result<Self, <SharedI2cDevice<SystemI2cBus> as embedded_hal_async::i2c::ErrorType>::Error>
     {
-        let mut addr58 = Aw9523::new(SharedI2cDevice::new(system_bus), Address::Addr58);
-        let mut addr59 = Aw9523::new(SharedI2cDevice::new(system_bus), Address::Addr59);
-        let mut addr5a = Aw9523::new(SharedI2cDevice::new(system_bus), Address::Addr5A);
+        let mut addr58 = Aw9523::new(SharedI2cDevice::new(system_bus), Address::Addr58).await?;
+        let mut addr59 = Aw9523::new(SharedI2cDevice::new(system_bus), Address::Addr59).await?;
+        let mut addr5a = Aw9523::new(SharedI2cDevice::new(system_bus), Address::Addr5A).await?;
 
         addr58.init().await?;
         addr59.init().await?;
@@ -79,14 +79,14 @@ where
             other: OtherPins {
                 vbus_sw: addr5a_pins.port0_pin4.try_into_output().await?,
                 usb_select: addr5a_pins.port0_pin5.try_into_output().await?,
-                accel_int: addr58_pins.port0_pin1.try_into_input().await?,
+                accel_int: addr58_pins.port0_pin1,
             },
             led: LedPins {
                 power_enable: addr5a_pins.port0_pin2.try_into_output().await?,
             },
             top_board: TopBoardPins {
-                ls_1: addr5a_pins.port1_pin7.try_into_input().await?,
-                ls_2: addr5a_pins.port1_pin6.try_into_input().await?,
+                ls_1: addr5a_pins.port1_pin7,
+                ls_2: addr5a_pins.port1_pin6,
             },
             hexpansion_detect: HexpansionDetectPins {
                 a: addr5a_pins.port1_pin4.try_into_output().await?,
@@ -97,54 +97,54 @@ where
                 f: addr59_pins.port1_pin3.try_into_output().await?,
             },
             buttons: ButtonPins {
-                btn1: addr5a_pins.port0_pin6.try_into_input().await?,
-                btn2: addr5a_pins.port0_pin7.try_into_input().await?,
-                btn3: addr59_pins.port0_pin0.try_into_input().await?,
-                btn4: addr59_pins.port0_pin1.try_into_input().await?,
-                btn5: addr59_pins.port0_pin2.try_into_input().await?,
-                btn6: addr59_pins.port0_pin3.try_into_input().await?,
+                btn1: addr5a_pins.port0_pin6,
+                btn2: addr5a_pins.port0_pin7,
+                btn3: addr59_pins.port0_pin0,
+                btn4: addr59_pins.port0_pin1,
+                btn5: addr59_pins.port0_pin2,
+                btn6: addr59_pins.port0_pin3,
             },
             hexpansion_a: HexpansionAPins {
-                ls_1: addr5a_pins.port0_pin3.try_into_input().await?,
-                ls_2: addr5a_pins.port1_pin0.try_into_input().await?,
-                ls_3: addr5a_pins.port1_pin1.try_into_input().await?,
-                ls_4: addr5a_pins.port1_pin2.try_into_input().await?,
-                ls_5: addr5a_pins.port1_pin3.try_into_input().await?,
+                ls_1: addr5a_pins.port0_pin3,
+                ls_2: addr5a_pins.port1_pin0,
+                ls_3: addr5a_pins.port1_pin1,
+                ls_4: addr5a_pins.port1_pin2,
+                ls_5: addr5a_pins.port1_pin3,
             },
             hexpansion_b: HexpansionBPins {
-                ls_1: addr5a_pins.port0_pin0.try_into_input().await?,
-                ls_2: addr5a_pins.port0_pin1.try_into_input().await?,
-                ls_3: addr59_pins.port1_pin5.try_into_input().await?,
-                ls_4: addr59_pins.port1_pin6.try_into_input().await?,
-                ls_5: addr59_pins.port1_pin7.try_into_input().await?,
+                ls_1: addr5a_pins.port0_pin0,
+                ls_2: addr5a_pins.port0_pin1,
+                ls_3: addr59_pins.port1_pin5,
+                ls_4: addr59_pins.port1_pin6,
+                ls_5: addr59_pins.port1_pin7,
             },
             hexpansion_c: HexpansionCPins {
-                ls_1: addr59_pins.port0_pin4.try_into_input().await?,
-                ls_2: addr59_pins.port0_pin5.try_into_input().await?,
-                ls_3: addr59_pins.port0_pin6.try_into_input().await?,
-                ls_4: addr59_pins.port0_pin7.try_into_input().await?,
-                ls_5: addr59_pins.port1_pin4.try_into_input().await?,
+                ls_1: addr59_pins.port0_pin4,
+                ls_2: addr59_pins.port0_pin5,
+                ls_3: addr59_pins.port0_pin6,
+                ls_4: addr59_pins.port0_pin7,
+                ls_5: addr59_pins.port1_pin4,
             },
             hexpansion_d: HexpansionDPins {
-                ls_1: addr58_pins.port1_pin0.try_into_input().await?,
-                ls_2: addr58_pins.port1_pin1.try_into_input().await?,
-                ls_3: addr58_pins.port1_pin2.try_into_input().await?,
-                ls_4: addr58_pins.port1_pin3.try_into_input().await?,
-                ls_5: addr58_pins.port0_pin0.try_into_input().await?,
+                ls_1: addr58_pins.port1_pin0,
+                ls_2: addr58_pins.port1_pin1,
+                ls_3: addr58_pins.port1_pin2,
+                ls_4: addr58_pins.port1_pin3,
+                ls_5: addr58_pins.port0_pin0,
             },
             hexpansion_e: HexpansionEPins {
-                ls_1: addr58_pins.port0_pin2.try_into_input().await?,
-                ls_2: addr58_pins.port0_pin3.try_into_input().await?,
-                ls_3: addr58_pins.port0_pin4.try_into_input().await?,
-                ls_4: addr58_pins.port0_pin5.try_into_input().await?,
-                ls_5: addr58_pins.port0_pin6.try_into_input().await?,
+                ls_1: addr58_pins.port0_pin2,
+                ls_2: addr58_pins.port0_pin3,
+                ls_3: addr58_pins.port0_pin4,
+                ls_4: addr58_pins.port0_pin5,
+                ls_5: addr58_pins.port0_pin6,
             },
             hexpansion_f: HexpansionFPins {
-                ls_1: addr58_pins.port0_pin7.try_into_input().await?,
-                ls_2: addr58_pins.port1_pin4.try_into_input().await?,
-                ls_3: addr58_pins.port1_pin5.try_into_input().await?,
-                ls_4: addr58_pins.port1_pin6.try_into_input().await?,
-                ls_5: addr58_pins.port1_pin7.try_into_input().await?,
+                ls_1: addr58_pins.port0_pin7,
+                ls_2: addr58_pins.port1_pin4,
+                ls_3: addr58_pins.port1_pin5,
+                ls_4: addr58_pins.port1_pin6,
+                ls_5: addr58_pins.port1_pin7,
             },
         })
     }
