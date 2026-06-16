@@ -6,14 +6,14 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use defmt::info;
+use defmt::{debug, info};
 use embassy_executor::Spawner;
 use embassy_futures::select::{Either, select};
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
     pubsub::{PubSubChannel, WaitResult},
 };
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Instant, Ticker, Timer};
 use embedded_graphics::{
     Drawable,
     draw_target::DrawTarget,
@@ -167,23 +167,59 @@ async fn power_task(mut bq: Bq25895<bq25895::Interface<SharedI2cDevice<SystemI2c
     loop {
         tick.next().await;
 
-        info!("Battery stats:");
+        info!("power stats @ {}s", Instant::now().as_secs());
+
+        // Feed watchdog
+        bq.reg_03()
+            .modify_async(|r| r.set_wd_rst(bq25895::I2cWatchdogReset::Normal))
+            .await
+            .unwrap();
+
+        // Set input current limit
+        bq.reg_00()
+            .modify_async(|r| r.set_iinlim(bq25895::InputCurrentLimit::try_new(600).unwrap()))
+            .await
+            .unwrap();
+
+        // Request measurement
+        bq.reg_02()
+            .modify_async(|r| r.set_conv_start(bq25895::AdcConversionControl::Started))
+            .await
+            .unwrap();
+
+        // Wait for measurement to finish
+        'read: loop {
+            let reg = bq.reg_02().read_async().await.unwrap();
+            if reg.conv_start().unwrap() == bq25895::AdcConversionControl::Inactive {
+                break 'read;
+            }
+            Timer::after_millis(100).await;
+            debug!("Waiting for reading...");
+        }
+
+        let reg = bq.reg_02().read_async().await.unwrap();
+        info!("conv start: {}", reg.conv_start().unwrap());
+        info!("conv rate: {}", reg.conv_rate().unwrap());
+        let reg = bq.reg_00().read_async().await.unwrap();
+        info!("input current limit: {}", reg.iinlim().unwrap());
         let reg = bq.reg_0_b().read_async().await.unwrap();
         info!("Vbus stat: {}", reg.vbus_stat().unwrap());
         info!("Charging stat.: {}", reg.chrg_stat().unwrap());
         info!("PG: {}", reg.pg_stat().unwrap());
+        let reg = bq.reg_0_c().read_async().await.unwrap();
+        info!("WDT: {}", reg.watchdog_fault().unwrap());
+        let reg = bq.reg_04().read_async().await.unwrap();
+        info!("Ichg_lim: {}", reg.ichg().unwrap());
         let reg = bq.reg_11().read_async().await.unwrap();
         info!("Vbus: {}", reg.vbusv().unwrap());
-        let reg = bq.reg_12().read_async().await.unwrap();
-        info!("Ichgr: {}", reg.ichgr().unwrap());
+        let reg = bq.reg_0_f().read_async().await.unwrap();
+        info!("Vsys: {}", reg.sysv().unwrap());
         let reg = bq.reg_0_e().read_async().await.unwrap();
         info!("Vbat: {}", reg.batv().unwrap());
-        let reg = bq.reg_00().read_async().await.unwrap();
-        info!("input current limit: {}", reg.iinlim().unwrap());
-        let reg = bq.reg_0_d().read_async().await.unwrap();
-        info!("vdpm: {}", reg.vindpm().unwrap());
-        let reg = bq.reg_10().read_async().await.unwrap();
-        info!("tsvpct: {}", reg.tspct().unwrap());
+        let reg = bq.reg_12().read_async().await.unwrap();
+        info!("Ichgr: {}", reg.ichgr().unwrap());
+        let reg = bq.reg_14().read_async().await.unwrap();
+        info!("ico: {}", reg.ico_optimized().unwrap());
     }
 }
 
