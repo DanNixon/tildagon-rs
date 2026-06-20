@@ -21,7 +21,7 @@ use fake_pin::FakePin;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
-    buttons::Buttons,
+    embedded_aw9523::{PinConfiguration, async_traits::digital::OutputPin},
     esp_hal::{
         self,
         clock::CpuClock,
@@ -37,13 +37,9 @@ use tildagon::{
         time::Rate,
         timer::timg::TimerGroup,
     },
-    hexpansion_slots::{HexpansionSlot, HexpansionSlotControl},
+    hexpansions::{HexpansionSlot, HexpansionSlotControl},
     i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
-    leds::Leds,
-    pins::{
-        PinControl,
-        embedded_aw9523::{PinConfiguration, async_traits::digital::OutputPin},
-    },
+    pins::PinControl,
     resources::*,
 };
 
@@ -81,21 +77,16 @@ async fn main(spawner: Spawner) {
     let mut usb_sel = pins.other.usb_select;
     usb_sel.set_low().await.unwrap();
 
-    let _buttons = Buttons::new(pins.buttons);
-
     let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
         .await
         .unwrap();
 
     let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
-    static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
-    let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
+    let mut led_power = tildagon::system::OnboardLedPower::new(pins.led);
+    led_power.set_on(true).await.unwrap();
 
-    let mut leds = Leds::new(pins.led, r.led, rmt.channel0, rmt_buffer);
-    leds.set_power(true).await.unwrap();
-
-    spawner.must_spawn(leds::task(leds));
+    spawner.must_spawn(leds::task(r.led, rmt.channel0));
 
     let hex_a_fast = r.hexpansion_a;
     let hex_a_slow = pins.hexpansion_a;
@@ -163,7 +154,7 @@ async fn main(spawner: Spawner) {
     );
     spawner.spawn(net_task(runner)).unwrap();
 
-    spawner.must_spawn(display::task(r.top_board, r.display, stack));
+    spawner.must_spawn(display::task(r.top_board, p.SPI2, p.DMA_CH0, stack));
 
     info!("Waiting for DHCP...");
     stack.wait_link_up().await;
@@ -177,7 +168,7 @@ async fn main(spawner: Spawner) {
 
 type EthernetSpi = ExclusiveDevice<
     SpiDmaBus<'static, tildagon::esp_hal::Async>,
-    tildagon::pins::embedded_aw9523::Output<SharedI2cDevice<SystemI2cBus>>,
+    tildagon::embedded_aw9523::Output<SharedI2cDevice<SystemI2cBus>>,
     embassy_time::Delay,
 >;
 

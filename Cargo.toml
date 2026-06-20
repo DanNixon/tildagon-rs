@@ -12,10 +12,6 @@ path = "src/lib.rs"
 test = false
 bench = false
 
-[features]
-top-board-none = []
-top-board-2024 = []
-
 [dependencies]
 bmi2 = "0.1.2"
 bq25895 = "0.0.3"

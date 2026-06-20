@@ -23,7 +23,7 @@ panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
 rtt-target = { version = "0.6.1", features = ["defmt"] }
 smart-leds = "0.4.0"
 static_cell = { version = "2.1.0", features = ["nightly"] }
-tildagon = { path = "../../", features = ["top-board-none"] }
+tildagon = { path = "../../" }
 
 [profile.dev]
 # Rust debug is too slow.

@@ -1,11 +1,10 @@
 [editor]
 workspace-lsp-roots = [
   ".",
-  "./examples/demo-2024",
-  "./examples/demo-no-top-board",
+  "./examples/demo",
   "./examples/ethernet-w5500",
   "./examples/i2c-scan",
-  "./examples/imu-2024",
+  "./examples/imu",
   "./examples/sdcard",
   "./examples/slow-io",
 ]

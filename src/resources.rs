@@ -18,10 +18,6 @@ esp_hal::assign_resources! {
             hs_3: GPIO2,
             hs_4: GPIO1,
         },
-        display: DisplayResources<'d> {
-            spi: SPI2,
-            dma: DMA_CH0,
-        },
         hexpansion_a: HexpansionAResources<'d> {
             hs_1: GPIO39,
             hs_2: GPIO40,

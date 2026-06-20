@@ -6,7 +6,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
 
 jobs:
@@ -29,8 +29,7 @@ jobs:
       - name: Clippy
         run: |
           source "$HOME/export-esp.sh"
-          nix develop --command cargo clippy --release -F top-board-none -- -D warnings
-          nix develop --command cargo clippy --release -F top-board-2024 -- -D warnings
+          nix develop --command cargo clippy --release -- -D warnings
 
   examples:
     name: Examples
@@ -41,11 +40,10 @@ jobs:
     strategy:
       matrix:
         example:
-          - demo-2024
-          - demo-no-top-board
+          - demo
           - ethernet-w5500
           - i2c-scan
-          - imu-2024
+          - imu
           - sdcard
           - slow-io
 

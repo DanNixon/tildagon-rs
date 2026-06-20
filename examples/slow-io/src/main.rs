@@ -12,14 +12,11 @@ use embedded_hal::pwm::SetDutyCycle;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
-    esp_hal::{self, clock::CpuClock, rmt::Rmt, time::Rate, timer::timg::TimerGroup},
-    hexpansion_slots::{HexpansionSlot, HexpansionSlotControl},
+    embedded_aw9523::{PinConfiguration, async_traits::digital::OutputPin},
+    esp_hal::{self, clock::CpuClock, timer::timg::TimerGroup},
+    hexpansions::{HexpansionSlot, HexpansionSlotControl},
     i2c::SharedI2cBus,
-    leds::Leds,
-    pins::{
-        PinControl,
-        embedded_aw9523::{PinConfiguration, async_traits::digital::OutputPin},
-    },
+    pins::PinControl,
     resources::*,
 };
 
@@ -60,15 +57,6 @@ async fn main(_spawner: Spawner) {
     let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
         .await
         .unwrap();
-
-    let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
-
-    static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
-    let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
-
-    let mut leds = Leds::new(pins.led, r.led, rmt.channel0, rmt_buffer);
-    leds.set_power(true).await.unwrap();
-    leds.intensity = 32;
 
     // A little time for other tasks to start.
     // Hacky as all fuck but good enough for a demo.

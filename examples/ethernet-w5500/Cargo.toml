@@ -31,11 +31,10 @@ heapless = { version = "0.9.3", features = ["defmt"] }
 panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
 portable-atomic = { version = "1.13.1", features = ["critical-section"] }
 rtt-target = { version = "0.6.1", features = ["defmt"] }
-smart-leds = "0.4.0"
 sntpc = { version = "0.9.0", features = ["defmt"] }
 sntpc-net-embassy = { version = "0.9.0", default-features = false, features = ["defmt"] }
 static_cell = { version = "2.1.0", features = ["nightly"] }
-tildagon = { path = "../../", features = ["top-board-2024"] }
+tildagon = { path = "../../" }
 
 [profile.dev]
 # Rust debug is too slow.
