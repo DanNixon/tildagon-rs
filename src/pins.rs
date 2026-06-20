@@ -51,7 +51,9 @@ impl PinControl {
 }
 
 pub struct Pins<SysI2C> {
-    pub other: OtherPins<SysI2C>,
+    pub vbus: VbusPins<SysI2C>,
+    pub usb: UsbPins<SysI2C>,
+    pub imu: ImuPins<SysI2C>,
     pub led: LedPins<SysI2C>,
     pub top_board: TopBoardPins<SysI2C>,
     pub hexpansion_detect: HexpansionDetectPins<SysI2C>,
@@ -74,10 +76,14 @@ where
         addr5a_pins: embedded_aw9523::Pins<SysI2C>,
     ) -> Result<Self, E> {
         Ok(Self {
-            other: OtherPins {
+            vbus: VbusPins {
                 vbus_sw: addr5a_pins.port0_pin4.try_into_output().await?,
+            },
+            usb: UsbPins {
                 usb_select: addr5a_pins.port0_pin5.try_into_output().await?,
-                accel_int: addr58_pins.port0_pin1,
+            },
+            imu: ImuPins {
+                imu_int: addr58_pins.port0_pin1,
             },
             led: LedPins {
                 power_enable: addr5a_pins.port0_pin2.try_into_output().await?,
@@ -148,10 +154,16 @@ where
     }
 }
 
-pub struct OtherPins<SysI2C> {
+pub struct VbusPins<SysI2C> {
     pub vbus_sw: Output<SysI2C>,
+}
+
+pub struct UsbPins<SysI2C> {
     pub usb_select: Output<SysI2C>,
-    pub accel_int: Input<SysI2C>,
+}
+
+pub struct ImuPins<SysI2C> {
+    pub imu_int: Input<SysI2C>,
 }
 
 pub struct LedPins<SysI2C> {

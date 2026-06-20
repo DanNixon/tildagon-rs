@@ -14,6 +14,7 @@ pub mod pins;
 pub mod power;
 pub mod resources;
 pub mod system_interrupt;
+pub mod usb;
 
 // Re-exports
 pub use bmi2;

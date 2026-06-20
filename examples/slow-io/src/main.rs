@@ -12,12 +12,13 @@ use embedded_hal::pwm::SetDutyCycle;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
-    embedded_aw9523::{PinConfiguration, async_traits::digital::OutputPin},
+    embedded_aw9523::PinConfiguration,
     esp_hal::{self, clock::CpuClock, timer::timg::TimerGroup},
     hexpansions::{HexpansionSlot, HexpansionSlotControl},
     i2c::SharedI2cBus,
     pins::PinControl,
     resources::*,
+    usb::{UsbPort, UsbSwitch},
 };
 
 extern crate alloc;
@@ -51,8 +52,8 @@ async fn main(_spawner: Spawner) {
     let mut pin_control = PinControl::new(i2c_system).await.unwrap();
     let pins = pin_control.pins();
 
-    let mut usb_sel = pins.other.usb_select;
-    usb_sel.set_low().await.unwrap();
+    let mut usb_sw = UsbSwitch::new(pins.usb);
+    usb_sw.set(UsbPort::In).await.unwrap();
 
     let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
         .await
