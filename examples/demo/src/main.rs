@@ -33,7 +33,6 @@ use static_cell::StaticCell;
 use tildagon::{
     bq25895::{self, Bq25895},
     button_collection::{ButtonEvent, ButtonState},
-    embedded_aw9523::async_traits::digital::OutputPin,
     esp_hal::{
         self,
         clock::CpuClock,
@@ -57,6 +56,7 @@ use tildagon::{
         RGB8, SmartLedsWrite,
         hsv::{Hsv, hsv2rgb},
     },
+    usb::{UsbPort, UsbSwitch},
 };
 
 extern crate alloc;
@@ -90,8 +90,8 @@ async fn main(spawner: Spawner) {
     let mut pin_control = PinControl::new(i2c_system).await.unwrap();
     let pins = pin_control.pins();
 
-    let mut usb_sel = pins.other.usb_select;
-    usb_sel.set_low().await.unwrap();
+    let mut usb_sw = UsbSwitch::new(pins.usb);
+    usb_sw.set(UsbPort::In).await.unwrap();
 
     let mut buttons = tildagon::front::emf2024::SystemButtonCollection::new(pins.buttons);
 

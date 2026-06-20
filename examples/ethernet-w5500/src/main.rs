@@ -42,6 +42,7 @@ use tildagon::{
     led_power::OnboardLedPower,
     pins::PinControl,
     resources::*,
+    usb::{UsbPort, UsbSwitch},
 };
 
 extern crate alloc;
@@ -75,8 +76,8 @@ async fn main(spawner: Spawner) {
     let mut pin_control = PinControl::new(i2c_system).await.unwrap();
     let pins = pin_control.pins();
 
-    let mut usb_sel = pins.other.usb_select;
-    usb_sel.set_low().await.unwrap();
+    let mut usb_sw = UsbSwitch::new(pins.usb);
+    usb_sw.set(UsbPort::In).await.unwrap();
 
     let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
         .await
