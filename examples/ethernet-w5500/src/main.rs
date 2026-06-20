@@ -39,6 +39,7 @@ use tildagon::{
     },
     hexpansions::{HexpansionSlot, HexpansionSlotControl},
     i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
+    led_power::OnboardLedPower,
     pins::PinControl,
     resources::*,
 };
@@ -83,8 +84,8 @@ async fn main(spawner: Spawner) {
 
     let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
-    let mut led_power = tildagon::system::OnboardLedPower::new(pins.led);
-    led_power.set_on(true).await.unwrap();
+    let mut led_power = OnboardLedPower::new(pins.led);
+    led_power.set(true).await.unwrap();
 
     spawner.must_spawn(leds::task(r.led, rmt.channel0));
 

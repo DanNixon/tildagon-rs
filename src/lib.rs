@@ -9,9 +9,11 @@ pub mod front;
 pub mod hexpansions;
 pub mod i2c;
 pub mod imu;
+pub mod led_power;
 pub mod pins;
+pub mod power;
 pub mod resources;
-pub mod system;
+pub mod system_interrupt;
 
 // Re-exports
 pub use bmi2;

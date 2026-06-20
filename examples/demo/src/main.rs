@@ -50,6 +50,7 @@ use tildagon::{
     },
     hexpansions::{HexpansionSlot, HexpansionSlotControl, HexpansionSlotEvent, HexpansionState},
     i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
+    led_power::OnboardLedPower,
     pins::PinControl,
     resources::*,
     smart_leds::{
@@ -100,8 +101,8 @@ async fn main(spawner: Spawner) {
 
     let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
-    let mut led_power = tildagon::system::OnboardLedPower::new(pins.led);
-    led_power.set_on(true).await.unwrap();
+    let mut led_power = OnboardLedPower::new(pins.led);
+    led_power.set(true).await.unwrap();
 
     static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
     let app_core_stack = APP_CORE_STACK.init(Stack::new());
@@ -121,7 +122,7 @@ async fn main(spawner: Spawner) {
         },
     );
 
-    let bq = tildagon::system::new_bq25895(i2c_system);
+    let bq = tildagon::power::new_bq25895(i2c_system);
     spawner.must_spawn(power_task(bq));
 
     spawner.must_spawn(led_task(r.led, rmt.channel0));
