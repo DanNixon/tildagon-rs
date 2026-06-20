@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.7](https://github.com/DanNixon/tildagon-rs/compare/v0.0.6...v0.0.7) - 2026-06-20
+
+### Added
+
+- [**breaking**] refactor device drivers
+- add microsd card hexpansion demo
+- integrate BQ25895 driver
+- [**breaking**] default aw9523 pins to input
+
+### Other
+
+- update Ubuntu version used in distrobox
+- update embedded-aw9523 version
+
 ## [0.0.6](https://github.com/DanNixon/tildagon-rs/compare/v0.0.5...v0.0.6) - 2026-06-09
 
 ### Added
