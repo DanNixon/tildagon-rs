@@ -29,25 +29,33 @@ use embedded_text::{
 };
 use esp_rtos::embassy::Executor;
 use panic_rtt_target as _;
-use smart_leds::{
-    RGB8,
-    hsv::{Hsv, hsv2rgb},
-};
 use static_cell::StaticCell;
 use tildagon::{
     bq25895::{self, Bq25895},
-    buttons::{Button, ButtonEvent, ButtonState, Buttons},
+    button_collection::{ButtonEvent, ButtonState},
+    embedded_aw9523::async_traits::digital::OutputPin,
     esp_hal::{
-        self, clock::CpuClock, interrupt::software::SoftwareInterruptControl, rmt::Rmt,
-        system::Stack, time::Rate, timer::timg::TimerGroup,
+        self,
+        clock::CpuClock,
+        interrupt::software::SoftwareInterruptControl,
+        peripherals::{DMA_CH0, SPI2},
+        rmt::Rmt,
+        system::Stack,
+        time::Rate,
+        timer::timg::TimerGroup,
     },
-    hexpansion_slots::{
-        HexpansionSlot, HexpansionSlotControl, HexpansionSlotEvent, HexpansionState,
+    front::{
+        FrontBoardLeds,
+        leds::{BaseBoardLed, FrontLeds, HexpansionPortLed},
     },
+    hexpansions::{HexpansionSlot, HexpansionSlotControl, HexpansionSlotEvent, HexpansionState},
     i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
-    leds::Leds,
-    pins::{PinControl, embedded_aw9523::async_traits::digital::OutputPin},
+    pins::PinControl,
     resources::*,
+    smart_leds::{
+        RGB8, SmartLedsWrite,
+        hsv::{Hsv, hsv2rgb},
+    },
 };
 
 extern crate alloc;
@@ -84,7 +92,7 @@ async fn main(spawner: Spawner) {
     let mut usb_sel = pins.other.usb_select;
     usb_sel.set_low().await.unwrap();
 
-    let mut buttons = Buttons::new(pins.buttons);
+    let mut buttons = tildagon::front::emf2024::SystemButtonCollection::new(pins.buttons);
 
     let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
         .await
@@ -92,11 +100,8 @@ async fn main(spawner: Spawner) {
 
     let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
 
-    static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
-    let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
-
-    let mut leds = Leds::new(pins.led, r.led, rmt.channel0, rmt_buffer);
-    leds.set_power(true).await.unwrap();
+    let mut led_power = tildagon::system::OnboardLedPower::new(pins.led);
+    led_power.set_on(true).await.unwrap();
 
     static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
     let app_core_stack = APP_CORE_STACK.init(Stack::new());
@@ -111,7 +116,7 @@ async fn main(spawner: Spawner) {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
-                spawner.must_spawn(display_task(r.top_board, r.display));
+                spawner.must_spawn(display_task(r.top_board, p.SPI2, p.DMA_CH0));
             });
         },
     );
@@ -119,7 +124,7 @@ async fn main(spawner: Spawner) {
     let bq = tildagon::system::new_bq25895(i2c_system);
     spawner.must_spawn(power_task(bq));
 
-    spawner.must_spawn(led_task(leds));
+    spawner.must_spawn(led_task(r.led, rmt.channel0));
     spawner.must_spawn(button_logic_task());
 
     // A little time for other tasks to start.
@@ -136,7 +141,7 @@ async fn main(spawner: Spawner) {
             Either::First(_) => {
                 let regs = pin_control.read_system_bus_input_registers().await.unwrap();
 
-                for event in buttons.update(&regs) {
+                for event in buttons.update(&regs).unwrap() {
                     info!("Button event: {}", event);
                     event_pub.publish(Event::Button(event)).await;
                 }
@@ -183,7 +188,7 @@ async fn power_task(mut bq: Bq25895<bq25895::Interface<SharedI2cDevice<SystemI2c
 
 #[derive(Clone)]
 enum Event {
-    Button(ButtonEvent),
+    Button(ButtonEvent<tildagon::front::emf2024::SystemButton>),
     HexpansionSlot(HexpansionSlotEvent),
 }
 
@@ -199,10 +204,21 @@ struct HexpansionControlMsg {
 static HEX_CONTROL_CHANNEL: PubSubChannel<CriticalSectionRawMutex, HexpansionControlMsg, 6, 1, 1> =
     PubSubChannel::new();
 
+use tildagon::front::FrontBoardDisplay;
+
 #[embassy_executor::task]
-async fn display_task(top_board: TopBoardResources<'static>, display: DisplayResources<'static>) {
+async fn display_task(
+    top_board: TopBoardResources<'static>,
+    spi: SPI2<'static>,
+    dma: DMA_CH0<'static>,
+) {
     let mut display_buffer = [0_u8; 512];
-    let mut display = tildagon::display::init(top_board, display, &mut display_buffer);
+    let mut display = <tildagon::front::Emf2024FrontBoard as FrontBoardDisplay>::Display::init(
+        top_board,
+        spi,
+        dma,
+        &mut display_buffer,
+    );
     display.clear(Rgb565::BLACK).unwrap();
 
     let mut event_sub = EVENT_CHANNEL.subscriber().unwrap();
@@ -251,12 +267,12 @@ async fn display_task(top_board: TopBoardResources<'static>, display: DisplayRes
             WaitResult::Lagged(_) => panic!(),
             WaitResult::Message(Event::Button(event)) => {
                 let (text, x) = match event.button() {
-                    Button::A => ("A", -50),
-                    Button::B => ("B", -30),
-                    Button::C => ("C", -10),
-                    Button::D => ("D", 10),
-                    Button::E => ("E", 30),
-                    Button::F => ("F", 50),
+                    tildagon::front::emf2024::SystemButton::A => ("A", -50),
+                    tildagon::front::emf2024::SystemButton::B => ("B", -30),
+                    tildagon::front::emf2024::SystemButton::C => ("C", -10),
+                    tildagon::front::emf2024::SystemButton::D => ("D", 10),
+                    tildagon::front::emf2024::SystemButton::E => ("E", 30),
+                    tildagon::front::emf2024::SystemButton::F => ("F", 50),
                 };
 
                 TextBox::with_textbox_style(
@@ -299,14 +315,25 @@ async fn display_task(top_board: TopBoardResources<'static>, display: DisplayRes
 }
 
 #[embassy_executor::task]
-async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
+async fn led_task(
+    r: LedResources<'static>,
+    rmt_channel: esp_hal::rmt::ChannelCreator<'static, esp_hal::Blocking, 0>,
+) {
+    let mut rmt_buffer = [esp_hal::rmt::PulseCode::end_marker();
+        tildagon::front::Emf2024FrontBoard::RMT_BUFFER_SIZE];
+
+    let mut adapter =
+        tildagon::esp_hal_smartled::SmartLedsAdapter::new(rmt_channel, r.data, &mut rmt_buffer);
+
+    let mut leds = <tildagon::front::Emf2024FrontBoard as FrontBoardLeds>::PixelBuffer::default();
+
     const HEX_DISABLED_COLOUR: RGB8 = RGB8::new(255, 0, 0);
     const HEX_EMPTY_COLOUR: RGB8 = RGB8::new(255, 192, 0);
     const HEX_OCCUPIED_COLOUR: RGB8 = RGB8::new(255, 255, 255);
 
-    *leds.main_board_pixel() = RGB8::new(128, 0, 128);
+    *leds.base_board() = RGB8::new(128, 0, 128);
 
-    leds.write().unwrap();
+    adapter.write(leds.into_iter()).unwrap();
 
     let mut colour = Hsv {
         hue: 0,
@@ -321,23 +348,20 @@ async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
         match select(event_sub.next_message(), front_pixel_tick.next()).await {
             Either::First(WaitResult::Lagged(_)) => panic!(),
             Either::First(WaitResult::Message(Event::HexpansionSlot(event))) => {
-                *leds.hexpansion_pixel(*event.slot()) = match *event.state() {
+                *leds.hexpansion_port(*event.slot()) = match *event.state() {
                     HexpansionState::Disabled => HEX_DISABLED_COLOUR,
                     HexpansionState::Empty => HEX_EMPTY_COLOUR,
                     HexpansionState::Occupied => HEX_OCCUPIED_COLOUR,
                 };
 
-                leds.write().unwrap();
+                adapter.write(leds.into_iter()).unwrap();
             }
             Either::First(_) => {}
             Either::Second(_) => {
                 colour.hue = colour.hue.wrapping_add(2);
+                leds.front().iter_mut().for_each(|d| *d = hsv2rgb(colour));
 
-                leds.front_pixels()
-                    .iter_mut()
-                    .for_each(|d| *d = hsv2rgb(colour));
-
-                leds.write().unwrap();
+                adapter.write(leds.into_iter()).unwrap();
             }
         }
     }
@@ -356,12 +380,12 @@ async fn button_logic_task() {
                     && let Some(short_press) = event.duration().map(|d| d < Duration::from_secs(1))
                 {
                     let slot = match event.button() {
-                        Button::A => HexpansionSlot::A,
-                        Button::B => HexpansionSlot::B,
-                        Button::C => HexpansionSlot::C,
-                        Button::D => HexpansionSlot::D,
-                        Button::E => HexpansionSlot::E,
-                        Button::F => HexpansionSlot::F,
+                        tildagon::front::emf2024::SystemButton::A => HexpansionSlot::A,
+                        tildagon::front::emf2024::SystemButton::B => HexpansionSlot::B,
+                        tildagon::front::emf2024::SystemButton::C => HexpansionSlot::C,
+                        tildagon::front::emf2024::SystemButton::D => HexpansionSlot::D,
+                        tildagon::front::emf2024::SystemButton::E => HexpansionSlot::E,
+                        tildagon::front::emf2024::SystemButton::F => HexpansionSlot::F,
                     };
 
                     let msg = HexpansionControlMsg {

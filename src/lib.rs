@@ -1,24 +1,22 @@
 #![no_std]
+#![allow(incomplete_features)]
 #![feature(adt_const_params)]
+#![feature(associated_type_defaults)]
+#![feature(inherent_associated_types)]
 
-pub mod hexpansion_slots;
+pub mod button_collection;
+pub mod front;
+pub mod hexpansions;
 pub mod i2c;
 pub mod imu;
 pub mod pins;
 pub mod resources;
 pub mod system;
 
-#[cfg(not(feature = "top-board-none"))]
-pub mod buttons;
-
-#[cfg(not(feature = "top-board-none"))]
-pub mod display;
-
-pub mod leds;
-
 // Re-exports
+pub use bmi2;
 pub use bq25895;
+pub use embedded_aw9523;
 pub use esp_hal;
-
-#[cfg(not(any(feature = "top-board-none", feature = "top-board-2024")))]
-compile_error!("You must enable at least one `top-board-*` feature.");
+pub use esp_hal_smartled;
+pub use smart_leds;

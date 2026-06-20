@@ -16,14 +16,16 @@ use embedded_sdmmc::SdCard;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
-    buttons::Buttons,
+    embedded_aw9523::{
+        PinConfiguration,
+        async_traits::digital::{InputPin, OutputPin},
+    },
     esp_hal::{
         self,
         clock::CpuClock,
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
         gpio::{Level, Output},
-        rmt::Rmt,
         spi::{
             Mode,
             master::{Config, Spi, SpiDmaBus},
@@ -31,16 +33,9 @@ use tildagon::{
         time::Rate,
         timer::timg::TimerGroup,
     },
-    hexpansion_slots::{HexpansionSlot, HexpansionSlotControl},
+    hexpansions::{HexpansionSlot, HexpansionSlotControl},
     i2c::SharedI2cBus,
-    leds::Leds,
-    pins::{
-        PinControl,
-        embedded_aw9523::{
-            PinConfiguration,
-            async_traits::digital::{InputPin, OutputPin},
-        },
-    },
+    pins::PinControl,
     resources::*,
 };
 
@@ -78,19 +73,9 @@ async fn main(_spawner: Spawner) {
     let mut usb_sel = pins.other.usb_select;
     usb_sel.set_low().await.unwrap();
 
-    let _buttons = Buttons::new(pins.buttons);
-
     let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
         .await
         .unwrap();
-
-    let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
-
-    static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
-    let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
-
-    let mut leds = Leds::new(pins.led, r.led, rmt.channel0, rmt_buffer);
-    leds.set_power(true).await.unwrap();
 
     let hex_a_fast = r.hexpansion_a;
     let hex_a_slow = pins.hexpansion_a;

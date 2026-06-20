@@ -2,8 +2,6 @@ use crate::i2c::{SharedI2cDevice, SharingRawMutex, SystemI2cBus};
 use embassy_sync::mutex::Mutex;
 use embedded_aw9523::{Address, Aw9523, Input, InputRegisters, Output, PinConfiguration};
 
-pub use embedded_aw9523;
-
 pub struct PinControl {
     system_bus: SharedI2cDevice<SystemI2cBus>,
     pins: Option<Pins<SharedI2cDevice<SystemI2cBus>>>,

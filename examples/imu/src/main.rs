@@ -7,9 +7,7 @@
 )]
 
 use core::fmt::Write;
-use defmt::info;
 use embassy_executor::Spawner;
-use embassy_futures::select::{Either, select};
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
     pubsub::{PubSubChannel, WaitResult},
@@ -31,18 +29,21 @@ use embedded_text::{
 use esp_rtos::embassy::Executor;
 use heapless::String;
 use panic_rtt_target as _;
-use smart_leds::RGB8;
 use static_cell::StaticCell;
 use tildagon::{
-    buttons::Buttons,
+    bmi2::types::{Data, PwrCtrl},
+    embedded_aw9523::async_traits::digital::OutputPin,
     esp_hal::{
-        self, clock::CpuClock, interrupt::software::SoftwareInterruptControl, rmt::Rmt,
-        system::Stack, time::Rate, timer::timg::TimerGroup,
+        self,
+        clock::CpuClock,
+        interrupt::software::SoftwareInterruptControl,
+        peripherals::{DMA_CH0, SPI2},
+        system::Stack,
+        timer::timg::TimerGroup,
     },
-    i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
-    imu::bmi2::types::{Data, PwrCtrl},
-    leds::Leds,
-    pins::{PinControl, embedded_aw9523::async_traits::digital::OutputPin},
+    front::FrontBoardDisplay,
+    i2c::{SharedI2cBus, SharedI2cDevice},
+    pins::PinControl,
     resources::*,
 };
 
@@ -53,7 +54,7 @@ extern crate alloc;
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_rtos::main]
-async fn main(spawner: Spawner) {
+async fn main(_spawner: Spawner) {
     rtt_target::rtt_init_defmt!();
 
     let config = tildagon::esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -80,16 +81,6 @@ async fn main(spawner: Spawner) {
     let mut usb_sel = pins.other.usb_select;
     usb_sel.set_low().await.unwrap();
 
-    let mut buttons = Buttons::new(pins.buttons);
-
-    let rmt: Rmt<'_, esp_hal::Blocking> = Rmt::new(p.RMT, Rate::from_mhz(80)).unwrap();
-
-    static RMT_BUFFER: StaticCell<tildagon::leds::RmtBuffer> = StaticCell::new();
-    let rmt_buffer = RMT_BUFFER.init(tildagon::leds::make_rmt_buffer());
-
-    let mut leds = Leds::new(pins.led, r.led, rmt.channel0, rmt_buffer);
-    leds.set_power(true).await.unwrap();
-
     let mut imu = tildagon::imu::init(SharedI2cDevice::new(i2c_system))
         .await
         .unwrap();
@@ -114,53 +105,38 @@ async fn main(spawner: Spawner) {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
-                spawner.must_spawn(display_task(r.top_board, r.display));
+                spawner.must_spawn(display_task(r.top_board, p.SPI2, p.DMA_CH0));
             });
         },
     );
-
-    spawner.must_spawn(led_task(leds));
 
     // A little time for other tasks to start.
     // Hacky as all fuck but good enough for a demo.
     // Use channels to indicate readiness properly, mkay.
     Timer::after_millis(500).await;
 
-    let mut io_tick = Ticker::every(Duration::from_millis(100));
     let mut imu_tick = Ticker::every(Duration::from_millis(250));
     let event_pub = EVENT_CHANNEL.publisher().unwrap();
 
     loop {
-        match select(io_tick.next(), imu_tick.next()).await {
-            Either::First(_) => {
-                let regs = pin_control.read_system_bus_input_registers().await.unwrap();
+        imu_tick.next().await;
 
-                for event in buttons.update(&regs) {
-                    info!("Button event: {}", event);
-                    event_pub.publish(Event::Button).await;
-                }
-            }
-            Either::Second(_) => {
-                let data: Data = imu.get_data().unwrap();
-                event_pub
-                    .publish(Event::ImuAxisData(ImuData {
-                        gyro_x: data.gyr.x,
-                        gyro_y: data.gyr.y,
-                        gyro_z: data.gyr.z,
-                        accel_x: data.acc.x,
-                        accel_y: data.acc.y,
-                        accel_z: data.acc.z,
-                    }))
-                    .await;
-            }
-        }
+        let data: Data = imu.get_data().unwrap();
+        event_pub
+            .publish(Event::ImuAxisData(ImuData {
+                gyro_x: data.gyr.x,
+                gyro_y: data.gyr.y,
+                gyro_z: data.gyr.z,
+                accel_x: data.acc.x,
+                accel_y: data.acc.y,
+                accel_z: data.acc.z,
+            }))
+            .await;
     }
 }
 
 #[derive(Clone)]
 enum Event {
-    Button,
-    // Button(ButtonEvent),
     ImuAxisData(ImuData),
 }
 
@@ -178,9 +154,18 @@ static EVENT_CHANNEL: PubSubChannel<CriticalSectionRawMutex, Event, 12, 4, 4> =
     PubSubChannel::new();
 
 #[embassy_executor::task]
-async fn display_task(top_board: TopBoardResources<'static>, display: DisplayResources<'static>) {
+async fn display_task(
+    top_board: TopBoardResources<'static>,
+    spi: SPI2<'static>,
+    dma: DMA_CH0<'static>,
+) {
     let mut display_buffer = [0_u8; 512];
-    let mut display = tildagon::display::init(top_board, display, &mut display_buffer);
+    let mut display = <tildagon::front::Emf2024FrontBoard as FrontBoardDisplay>::Display::init(
+        top_board,
+        spi,
+        dma,
+        &mut display_buffer,
+    );
     display.clear(Rgb565::BLACK).unwrap();
 
     let character_style = MonoTextStyleBuilder::new()
@@ -250,27 +235,6 @@ async fn display_task(top_board: TopBoardResources<'static>, display: DisplayRes
                         .draw(&mut display)
                         .unwrap();
                 }
-            }
-            WaitResult::Message(_) => {
-                // nothing
-            }
-        }
-    }
-}
-
-#[embassy_executor::task]
-async fn led_task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
-    *leds.main_board_pixel() = RGB8::new(128, 0, 128);
-
-    leds.write().unwrap();
-
-    let mut event_sub = EVENT_CHANNEL.subscriber().unwrap();
-
-    loop {
-        match event_sub.next_message().await {
-            WaitResult::Lagged(_) => panic!(),
-            WaitResult::Message(_) => {
-                // nothing
             }
         }
     }

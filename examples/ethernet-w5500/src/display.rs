@@ -14,16 +14,26 @@ use embedded_text::{
     alignment::{HorizontalAlignment, VerticalAlignment},
     style::TextBoxStyleBuilder,
 };
-use tildagon::resources::{DisplayResources, TopBoardResources};
+use tildagon::{
+    esp_hal::peripherals::{DMA_CH0, SPI2},
+    front::FrontBoardDisplay,
+    resources::TopBoardResources,
+};
 
 #[embassy_executor::task]
 pub(super) async fn task(
     top_board: TopBoardResources<'static>,
-    display: DisplayResources<'static>,
+    spi: SPI2<'static>,
+    dma: DMA_CH0<'static>,
     net: Stack<'static>,
 ) {
     let mut display_buffer = [0_u8; 512];
-    let mut display = tildagon::display::init(top_board, display, &mut display_buffer);
+    let mut display = <tildagon::front::Emf2024FrontBoard as FrontBoardDisplay>::Display::init(
+        top_board,
+        spi,
+        dma,
+        &mut display_buffer,
+    );
     display.clear(Rgb565::BLACK).unwrap();
 
     let character_style = MonoTextStyleBuilder::new()

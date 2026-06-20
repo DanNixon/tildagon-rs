@@ -12,11 +12,14 @@ use embassy_time::{Duration, Ticker};
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
+    embedded_aw9523::async_traits::digital::OutputPin,
     esp_hal::{self, clock::CpuClock, timer::timg::TimerGroup},
+    hexpansions::{HexpansionSlot, HexpansionSlotControl},
     i2c::{
         HexpansionAI2cBus, HexpansionBI2cBus, HexpansionCI2cBus, HexpansionDI2cBus,
         HexpansionEI2cBus, HexpansionFI2cBus, SharedI2cBus, SystemI2cBus, TopBoardI2cBus,
     },
+    pins::PinControl,
     resources::*,
 };
 
@@ -70,6 +73,41 @@ async fn main(_spawner: Spawner) {
     let i2c_hex_e = I2C_HEX_E.init(tildagon::i2c::hexpansion_e_i2c_bus(i2c_bus));
     static I2C_HEX_F: StaticCell<SharedI2cBus<HexpansionFI2cBus>> = StaticCell::new();
     let i2c_hex_f = I2C_HEX_F.init(tildagon::i2c::hexpansion_f_i2c_bus(i2c_bus));
+
+    let mut pin_control = PinControl::new(i2c_system).await.unwrap();
+    let pins = pin_control.pins();
+
+    let mut usb_sel = pins.other.usb_select;
+    usb_sel.set_low().await.unwrap();
+
+    let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
+        .await
+        .unwrap();
+
+    hex_slots
+        .set_enabled(HexpansionSlot::A, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::B, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::C, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::D, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::E, true)
+        .await
+        .unwrap();
+    hex_slots
+        .set_enabled(HexpansionSlot::F, true)
+        .await
+        .unwrap();
 
     let mut tick = Ticker::every(Duration::from_secs(30));
 

@@ -1,15 +1,33 @@
+use crate::LedResources;
 use chrono::{FixedOffset, Timelike};
 use embassy_time::{Duration, Ticker};
-use smart_leds::RGB8;
 use tildagon::{
-    i2c::{SharedI2cDevice, SystemI2cBus},
-    leds::Leds,
+    esp_hal::{
+        self,
+        rmt::{ChannelCreator, PulseCode},
+    },
+    front::{
+        FrontBoardLeds,
+        leds::{BaseBoardLed, FrontLeds},
+    },
+    smart_leds::{RGB8, SmartLedsWrite},
 };
 
 #[embassy_executor::task]
-pub(super) async fn task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>) {
-    *leds.main_board_pixel() = RGB8::new(128, 0, 128);
-    leds.write().unwrap();
+pub(super) async fn task(
+    r: LedResources<'static>,
+    rmt_channel: ChannelCreator<'static, esp_hal::Blocking, 0>,
+) {
+    let mut rmt_buffer =
+        [PulseCode::end_marker(); tildagon::front::Emf2024FrontBoard::RMT_BUFFER_SIZE];
+
+    let mut adapter =
+        tildagon::esp_hal_smartled::SmartLedsAdapter::new(rmt_channel, r.data, &mut rmt_buffer);
+
+    let mut leds = <tildagon::front::Emf2024FrontBoard as FrontBoardLeds>::PixelBuffer::default();
+
+    *leds.base_board() = RGB8::new(128, 0, 128);
+    adapter.write(leds.into_iter()).unwrap();
 
     let mut tick = Ticker::every(Duration::from_hz(1));
 
@@ -30,19 +48,18 @@ pub(super) async fn task(mut leds: Leds<'static, SharedI2cDevice<SystemI2cBus>>)
                     n => n - 1,
                 };
 
-                leds.front_pixels().fill(RGB8::default());
-                leds.front_pixels()[hour_pixel_idx] =
-                    leds.front_pixels()[hour_pixel_idx] + RGB8::new(127, 0, 0);
-                leds.front_pixels()[minute_pixel_idx] =
-                    leds.front_pixels()[minute_pixel_idx] + RGB8::new(0, 127, 0);
-                leds.front_pixels()[second_pixel_idx] =
-                    leds.front_pixels()[second_pixel_idx] + RGB8::new(0, 0, 127);
+                leds.front().fill(RGB8::default());
+                leds.front()[hour_pixel_idx] = leds.front()[hour_pixel_idx] + RGB8::new(127, 0, 0);
+                leds.front()[minute_pixel_idx] =
+                    leds.front()[minute_pixel_idx] + RGB8::new(0, 127, 0);
+                leds.front()[second_pixel_idx] =
+                    leds.front()[second_pixel_idx] + RGB8::new(0, 0, 127);
             }
             None => {
-                leds.front_pixels().fill(RGB8::new(128, 0, 0));
+                leds.front().fill(RGB8::new(128, 0, 0));
             }
         }
 
-        leds.write().unwrap();
+        adapter.write(leds.into_iter()).unwrap();
     }
 }
