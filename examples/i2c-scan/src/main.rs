@@ -6,17 +6,19 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use defmt::info;
+use defmt::{info, warn};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Ticker};
+use embedded_storage::ReadStorage;
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
     esp_hal::{self, clock::CpuClock, timer::timg::TimerGroup},
-    hexpansions::{HexpansionSlot, HexpansionSlotControl},
+    hexpansions::{HexpansionEepromHeader, HexpansionSlot, HexpansionSlotControl},
     i2c::{
         HexpansionAI2cBus, HexpansionBI2cBus, HexpansionCI2cBus, HexpansionDI2cBus,
-        HexpansionEI2cBus, HexpansionFI2cBus, SharedI2cBus, SystemI2cBus, TopBoardI2cBus,
+        HexpansionEI2cBus, HexpansionFI2cBus, SharedI2cBus, SharedI2cDevice, SystemI2cBus,
+        TopBoardI2cBus,
     },
     pins::PinControl,
     resources::*,
@@ -109,7 +111,48 @@ async fn main(_spawner: Spawner) {
         .await
         .unwrap();
 
-    let mut tick = Ticker::every(Duration::from_secs(30));
+    {
+        let mut top_eeprom = tildagon::eeprom::detect_eeprom(SharedI2cDevice::new(i2c_top))
+            .await
+            .unwrap();
+
+        // Read the hexpansion header from the top board
+        let mut rx_buff = [0; 32];
+        top_eeprom.read(0, &mut rx_buff).unwrap();
+        let header = HexpansionEepromHeader::from_bytes(&rx_buff).unwrap();
+        info!("{}", header);
+        info!("PID/VID: 0x{:x}/0x{:x}", header.vid, header.pid);
+
+        // Check that converting it back to bytes gives the same as what was read
+        let tx_buff = header.to_bytes();
+        assert_eq!(rx_buff, tx_buff);
+    }
+
+    if let Ok(mut a_eeprom) = tildagon::eeprom::detect_eeprom(SharedI2cDevice::new(i2c_hex_a)).await
+    {
+        // let header = HexpansionEepromHeader {
+        //     version: HexpansionManifestVersion::V2024,
+        //     filesystem_offset: 64,
+        //     eeprom_page_size: 64,
+        //     eeprom_total_size: 8_192,
+        //     vid: 0x5100,
+        //     pid: 0xB00B,
+        //     uid: 0,
+        //     friendly_name: "wabbit".try_into().unwrap(),
+        // };
+
+        // let bytes = header.to_bytes();
+        // a_eeprom.write(0, &bytes).unwrap();
+
+        let mut buff = [0; 32];
+        a_eeprom.read(0, &mut buff).unwrap();
+        let header = HexpansionEepromHeader::from_bytes(&buff).unwrap();
+        info!("{}", header);
+    } else {
+        warn!("(probably) nothing in hexpansion port A");
+    }
+
+    let mut tick = Ticker::every(Duration::from_secs(10));
 
     loop {
         scan_and_report!(i2c_system, "System");

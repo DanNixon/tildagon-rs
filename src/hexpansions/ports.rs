@@ -9,6 +9,16 @@ use getset::Getters;
 use heapless::{Vec, index_map::FnvIndexMap};
 use strum::{EnumCount, EnumIter, IntoEnumIterator};
 
+#[derive(Debug, Format, PartialEq, Eq, Clone, Copy, Hash, EnumIter, EnumCount)]
+pub enum HexpansionSlot {
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+}
+
 pub struct HexpansionSlotControl<I2C> {
     state: FnvIndexMap<HexpansionSlot, SlotState<I2C>, 8>,
 }
@@ -179,16 +189,6 @@ where
             present: false,
         })
     }
-}
-
-#[derive(Debug, Format, PartialEq, Eq, Clone, Copy, Hash, EnumIter, EnumCount)]
-pub enum HexpansionSlot {
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
 }
 
 #[derive(Debug, Format, PartialEq, Eq, Clone, Copy, Getters)]
