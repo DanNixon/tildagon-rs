@@ -5,6 +5,7 @@
 #![feature(inherent_associated_types)]
 
 pub mod button_collection;
+pub mod eeprom;
 pub mod front;
 pub mod hexpansions;
 pub mod i2c;
