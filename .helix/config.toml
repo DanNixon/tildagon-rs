@@ -4,6 +4,5 @@ workspace-lsp-roots = [
   "./examples/demo",
   "./examples/i2c-scan",
   "./examples/imu",
-  "./examples/sdcard",
   "./examples/slow-io",
 ]
