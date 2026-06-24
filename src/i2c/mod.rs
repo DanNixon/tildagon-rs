@@ -55,7 +55,7 @@ macro_rules! define_i2c_bus {
 }
 
 define_i2c_bus!(system_i2c_bus, SystemI2cBus, Bus7);
-define_i2c_bus!(top_i2c_bus, TopBoardI2cBus, Bus0);
+define_i2c_bus!(front_i2c_bus, FrontBoardI2cBus, Bus0);
 define_i2c_bus!(hexpansion_a_i2c_bus, HexpansionAI2cBus, Bus1);
 define_i2c_bus!(hexpansion_b_i2c_bus, HexpansionBI2cBus, Bus2);
 define_i2c_bus!(hexpansion_c_i2c_bus, HexpansionCI2cBus, Bus3);

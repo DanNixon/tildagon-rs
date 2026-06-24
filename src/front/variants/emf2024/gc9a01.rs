@@ -1,4 +1,4 @@
-use crate::resources::TopBoardResources;
+use crate::resources::FrontBoardResources;
 use embedded_hal_bus::spi::{ExclusiveDevice, NoDelay};
 use esp_hal::{
     Blocking,
@@ -38,7 +38,7 @@ impl Gc9a01 {
         DMA: esp_hal::dma::DmaChannel
             + esp_hal::dma::DmaChannelFor<esp_hal::spi::master::AnySpi<'static>>,
     >(
-        top_board: TopBoardResources<'static>,
+        front_board: FrontBoardResources<'static>,
         spi: SPI,
         dma: DMA,
         buffer: &'a mut [u8],
@@ -56,15 +56,15 @@ impl Gc9a01 {
                 .with_mode(Mode::_0),
         )
         .unwrap()
-        .with_sck(top_board.hs_1)
-        .with_mosi(top_board.hs_2)
+        .with_sck(front_board.hs_1)
+        .with_mosi(front_board.hs_2)
         .with_dma(dma)
         .with_buffers(dma_rx_buf, dma_tx_buf);
 
-        let cs = Output::new(top_board.hs_4, Level::High, Default::default());
+        let cs = Output::new(front_board.hs_4, Level::High, Default::default());
         let dev = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
 
-        let dc = Output::new(top_board.hs_3, Level::High, Default::default());
+        let dc = Output::new(front_board.hs_3, Level::High, Default::default());
         let di = SpiInterface::new(dev, dc, buffer);
 
         mipidsi::Builder::new(GC9A01, di)

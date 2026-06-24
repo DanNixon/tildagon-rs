@@ -10,7 +10,7 @@ use heapless::{Vec, index_map::FnvIndexMap};
 use strum::{EnumCount, EnumIter, IntoEnumIterator};
 
 #[derive(Debug, Format, PartialEq, Eq, Clone, Copy, Hash, EnumIter, EnumCount)]
-pub enum HexpansionSlot {
+pub enum HexpansionPort {
     A,
     B,
     C,
@@ -19,11 +19,11 @@ pub enum HexpansionSlot {
     F,
 }
 
-pub struct HexpansionSlotControl<I2C> {
-    state: FnvIndexMap<HexpansionSlot, SlotState<I2C>, 8>,
+pub struct HexpansionPortControl<I2C> {
+    state: FnvIndexMap<HexpansionPort, PortState<I2C>, 8>,
 }
 
-impl<I2C, E> HexpansionSlotControl<I2C>
+impl<I2C, E> HexpansionPortControl<I2C>
 where
     I2C: embedded_hal_async::i2c::I2c<Error = E>,
 {
@@ -31,44 +31,44 @@ where
         let mut state = FnvIndexMap::new();
 
         let _ = state.insert(
-            HexpansionSlot::A,
-            SlotState {
-                mode: SlotModeState::new(pins.a).await?,
+            HexpansionPort::A,
+            PortState {
+                mode: PortModeState::new(pins.a).await?,
                 notified: false,
             },
         );
         let _ = state.insert(
-            HexpansionSlot::B,
-            SlotState {
-                mode: SlotModeState::new(pins.b).await?,
+            HexpansionPort::B,
+            PortState {
+                mode: PortModeState::new(pins.b).await?,
                 notified: false,
             },
         );
         let _ = state.insert(
-            HexpansionSlot::C,
-            SlotState {
-                mode: SlotModeState::new(pins.c).await?,
+            HexpansionPort::C,
+            PortState {
+                mode: PortModeState::new(pins.c).await?,
                 notified: false,
             },
         );
         let _ = state.insert(
-            HexpansionSlot::D,
-            SlotState {
-                mode: SlotModeState::new(pins.d).await?,
+            HexpansionPort::D,
+            PortState {
+                mode: PortModeState::new(pins.d).await?,
                 notified: false,
             },
         );
         let _ = state.insert(
-            HexpansionSlot::E,
-            SlotState {
-                mode: SlotModeState::new(pins.e).await?,
+            HexpansionPort::E,
+            PortState {
+                mode: PortModeState::new(pins.e).await?,
                 notified: false,
             },
         );
         let _ = state.insert(
-            HexpansionSlot::F,
-            SlotState {
-                mode: SlotModeState::new(pins.f).await?,
+            HexpansionPort::F,
+            PortState {
+                mode: PortModeState::new(pins.f).await?,
                 notified: false,
             },
         );
@@ -76,57 +76,57 @@ where
         Ok(Self { state })
     }
 
-    pub async fn set_enabled(&mut self, slot: HexpansionSlot, enabled: bool) -> Result<(), E> {
-        let mut state = self.state.remove(&slot).unwrap();
+    pub async fn set_enabled(&mut self, port: HexpansionPort, enabled: bool) -> Result<(), E> {
+        let mut state = self.state.remove(&port).unwrap();
         state.mode = if enabled {
             state.mode.enable().await?
         } else {
             state.mode.disable().await?
         };
         state.notified = false;
-        let _ = self.state.insert(slot, state);
+        let _ = self.state.insert(port, state);
         Ok(())
     }
 
     pub fn update(
         &mut self,
         regs: &InputRegisters,
-    ) -> Vec<HexpansionSlotEvent, { HexpansionSlot::COUNT }> {
+    ) -> Vec<HexpansionPortEvent, { HexpansionPort::COUNT }> {
         let now = Instant::now();
 
         let mut events = Vec::new();
 
-        for hex_slot in HexpansionSlot::iter() {
-            let slot_state = self.state.get_mut(&hex_slot).unwrap();
+        for hex_port in HexpansionPort::iter() {
+            let port_state = self.state.get_mut(&hex_port).unwrap();
 
-            if let SlotModeState::Enabled {
+            if let PortModeState::Enabled {
                 ref pin,
                 ref mut present,
-            } = slot_state.mode
+            } = port_state.mode
             {
                 match regs.pin_state(pin).unwrap() {
                     PinState::Low => {
                         if !*present {
-                            slot_state.notified = false;
+                            port_state.notified = false;
                         }
                         *present = true;
                     }
                     PinState::High => {
                         if *present {
-                            slot_state.notified = false;
+                            port_state.notified = false;
                         }
                         *present = false;
                     }
                 }
             }
 
-            if !slot_state.notified {
-                let _ = events.push(HexpansionSlotEvent {
-                    slot: hex_slot,
+            if !port_state.notified {
+                let _ = events.push(HexpansionPortEvent {
+                    port: hex_port,
                     time: now,
-                    state: slot_state.state(),
+                    state: port_state.state(),
                 });
-                slot_state.notified = true;
+                port_state.notified = true;
             }
         }
 
@@ -135,16 +135,16 @@ where
     }
 }
 
-struct SlotState<I2C> {
-    mode: SlotModeState<I2C>,
+struct PortState<I2C> {
+    mode: PortModeState<I2C>,
     notified: bool,
 }
 
-impl<I2C> SlotState<I2C> {
+impl<I2C> PortState<I2C> {
     fn state(&self) -> HexpansionState {
         match &self.mode {
-            SlotModeState::Disabled { pin: _ } => HexpansionState::Disabled,
-            SlotModeState::Enabled { pin: _, present } => {
+            PortModeState::Disabled { pin: _ } => HexpansionState::Disabled,
+            PortModeState::Enabled { pin: _, present } => {
                 if *present {
                     HexpansionState::Occupied
                 } else {
@@ -155,12 +155,12 @@ impl<I2C> SlotState<I2C> {
     }
 }
 
-enum SlotModeState<I2C> {
+enum PortModeState<I2C> {
     Disabled { pin: Output<I2C> },
     Enabled { pin: Input<I2C>, present: bool },
 }
 
-impl<I2C, E> SlotModeState<I2C>
+impl<I2C, E> PortModeState<I2C>
 where
     I2C: embedded_hal_async::i2c::I2c<Error = E>,
 {
@@ -172,8 +172,8 @@ where
 
     async fn disable(self) -> Result<Self, E> {
         let mut pin = match self {
-            SlotModeState::Disabled { pin } => pin.try_into_output().await?,
-            SlotModeState::Enabled { pin, present: _ } => pin.try_into_output().await?,
+            PortModeState::Disabled { pin } => pin.try_into_output().await?,
+            PortModeState::Enabled { pin, present: _ } => pin.try_into_output().await?,
         };
         pin.set_high().await.unwrap(); // TODO
         Ok(Self::Disabled { pin })
@@ -181,8 +181,8 @@ where
 
     async fn enable(self) -> Result<Self, E> {
         let pin = match self {
-            SlotModeState::Disabled { pin } => pin.try_into_input().await?,
-            SlotModeState::Enabled { pin, present: _ } => pin.try_into_input().await?,
+            PortModeState::Disabled { pin } => pin.try_into_input().await?,
+            PortModeState::Enabled { pin, present: _ } => pin.try_into_input().await?,
         };
         Ok(Self::Enabled {
             pin,
@@ -192,28 +192,28 @@ where
 }
 
 #[derive(Debug, Format, PartialEq, Eq, Clone, Copy, Getters)]
-pub struct HexpansionSlotEvent {
-    /// The slot this event is about
+pub struct HexpansionPortEvent {
+    /// The port this event is about
     #[getset(get = "pub")]
-    slot: HexpansionSlot,
+    port: HexpansionPort,
 
     /// The time the event happened
     #[getset(get = "pub")]
     time: Instant,
 
-    /// The state the slot is now in
+    /// The state the port is now in
     #[getset(get = "pub")]
     state: HexpansionState,
 }
 
 #[derive(Debug, Format, PartialEq, Eq, Clone, Copy)]
 pub enum HexpansionState {
-    /// The slot is disabled and will not supply power
+    /// The port is disabled and will not supply power
     Disabled,
 
-    /// The slot is enabled, but no hexpansion is demanding power from it
+    /// The port is enabled, but no hexpansion is demanding power from it
     Empty,
 
-    /// The slot is enabled and contains a hexpansion that is demanding power
+    /// The port is enabled and contains a hexpansion that is demanding power
     Occupied,
 }

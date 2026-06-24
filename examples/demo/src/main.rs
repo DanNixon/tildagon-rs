@@ -47,7 +47,7 @@ use tildagon::{
         FrontBoardLeds,
         leds::{BaseBoardLed, FrontLeds, HexpansionPortLed},
     },
-    hexpansions::{HexpansionSlot, HexpansionSlotControl, HexpansionSlotEvent, HexpansionState},
+    hexpansions::{HexpansionPort, HexpansionPortControl, HexpansionPortEvent, HexpansionState},
     i2c::{SharedI2cBus, SharedI2cDevice, SystemI2cBus},
     led_power::OnboardLedPower,
     pins::PinControl,
@@ -95,7 +95,7 @@ async fn main(spawner: Spawner) {
 
     let mut buttons = tildagon::front::emf2024::SystemButtonCollection::new(pins.buttons);
 
-    let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
+    let mut hex_slots = HexpansionPortControl::new(pins.hexpansion_detect)
         .await
         .unwrap();
 
@@ -117,7 +117,7 @@ async fn main(spawner: Spawner) {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
-                spawner.must_spawn(display_task(r.top_board, p.SPI2, p.DMA_CH0));
+                spawner.must_spawn(display_task(r.front_board, p.SPI2, p.DMA_CH0));
             });
         },
     );
@@ -149,7 +149,7 @@ async fn main(spawner: Spawner) {
 
                 for event in hex_slots.update(&regs) {
                     info!("Hexpansion event: {}", event);
-                    event_pub.publish(Event::HexpansionSlot(event)).await;
+                    event_pub.publish(Event::HexpansionPort(event)).await;
                 }
             }
             Either::Second(WaitResult::Lagged(_)) => panic!(),
@@ -226,7 +226,7 @@ async fn power_task(mut bq: Bq25895<bq25895::Interface<SharedI2cDevice<SystemI2c
 #[derive(Clone)]
 enum Event {
     Button(ButtonEvent<tildagon::front::emf2024::SystemButton>),
-    HexpansionSlot(HexpansionSlotEvent),
+    HexpansionPort(HexpansionPortEvent),
 }
 
 static EVENT_CHANNEL: PubSubChannel<CriticalSectionRawMutex, Event, 12, 4, 4> =
@@ -234,7 +234,7 @@ static EVENT_CHANNEL: PubSubChannel<CriticalSectionRawMutex, Event, 12, 4, 4> =
 
 #[derive(Clone)]
 struct HexpansionControlMsg {
-    slot: HexpansionSlot,
+    slot: HexpansionPort,
     enable: bool,
 }
 
@@ -245,13 +245,13 @@ use tildagon::front::FrontBoardDisplay;
 
 #[embassy_executor::task]
 async fn display_task(
-    top_board: TopBoardResources<'static>,
+    front_board: FrontBoardResources<'static>,
     spi: SPI2<'static>,
     dma: DMA_CH0<'static>,
 ) {
     let mut display_buffer = [0_u8; 512];
     let mut display = <tildagon::front::Emf2024FrontBoard as FrontBoardDisplay>::Display::init(
-        top_board,
+        front_board,
         spi,
         dma,
         &mut display_buffer,
@@ -324,14 +324,14 @@ async fn display_task(
                 .draw(&mut display)
                 .unwrap();
             }
-            WaitResult::Message(Event::HexpansionSlot(event)) => {
-                let (text, x) = match event.slot() {
-                    HexpansionSlot::A => ("A", -50),
-                    HexpansionSlot::B => ("B", -30),
-                    HexpansionSlot::C => ("C", -10),
-                    HexpansionSlot::D => ("D", 10),
-                    HexpansionSlot::E => ("E", 30),
-                    HexpansionSlot::F => ("F", 50),
+            WaitResult::Message(Event::HexpansionPort(event)) => {
+                let (text, x) = match event.port() {
+                    HexpansionPort::A => ("A", -50),
+                    HexpansionPort::B => ("B", -30),
+                    HexpansionPort::C => ("C", -10),
+                    HexpansionPort::D => ("D", 10),
+                    HexpansionPort::E => ("E", 30),
+                    HexpansionPort::F => ("F", 50),
                 };
 
                 TextBox::with_textbox_style(
@@ -384,8 +384,8 @@ async fn led_task(
     loop {
         match select(event_sub.next_message(), front_pixel_tick.next()).await {
             Either::First(WaitResult::Lagged(_)) => panic!(),
-            Either::First(WaitResult::Message(Event::HexpansionSlot(event))) => {
-                *leds.hexpansion_port(*event.slot()) = match *event.state() {
+            Either::First(WaitResult::Message(Event::HexpansionPort(event))) => {
+                *leds.hexpansion_port(*event.port()) = match *event.state() {
                     HexpansionState::Disabled => HEX_DISABLED_COLOUR,
                     HexpansionState::Empty => HEX_EMPTY_COLOUR,
                     HexpansionState::Occupied => HEX_OCCUPIED_COLOUR,
@@ -417,12 +417,12 @@ async fn button_logic_task() {
                     && let Some(short_press) = event.duration().map(|d| d < Duration::from_secs(1))
                 {
                     let slot = match event.button() {
-                        tildagon::front::emf2024::SystemButton::A => HexpansionSlot::A,
-                        tildagon::front::emf2024::SystemButton::B => HexpansionSlot::B,
-                        tildagon::front::emf2024::SystemButton::C => HexpansionSlot::C,
-                        tildagon::front::emf2024::SystemButton::D => HexpansionSlot::D,
-                        tildagon::front::emf2024::SystemButton::E => HexpansionSlot::E,
-                        tildagon::front::emf2024::SystemButton::F => HexpansionSlot::F,
+                        tildagon::front::emf2024::SystemButton::A => HexpansionPort::A,
+                        tildagon::front::emf2024::SystemButton::B => HexpansionPort::B,
+                        tildagon::front::emf2024::SystemButton::C => HexpansionPort::C,
+                        tildagon::front::emf2024::SystemButton::D => HexpansionPort::D,
+                        tildagon::front::emf2024::SystemButton::E => HexpansionPort::E,
+                        tildagon::front::emf2024::SystemButton::F => HexpansionPort::F,
                     };
 
                     let msg = HexpansionControlMsg {

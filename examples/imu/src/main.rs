@@ -105,7 +105,7 @@ async fn main(_spawner: Spawner) {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
-                spawner.must_spawn(display_task(r.top_board, p.SPI2, p.DMA_CH0));
+                spawner.must_spawn(display_task(r.front_board, p.SPI2, p.DMA_CH0));
             });
         },
     );
@@ -155,13 +155,13 @@ static EVENT_CHANNEL: PubSubChannel<CriticalSectionRawMutex, Event, 12, 4, 4> =
 
 #[embassy_executor::task]
 async fn display_task(
-    top_board: TopBoardResources<'static>,
+    front_board: FrontBoardResources<'static>,
     spi: SPI2<'static>,
     dma: DMA_CH0<'static>,
 ) {
     let mut display_buffer = [0_u8; 512];
     let mut display = <tildagon::front::Emf2024FrontBoard as FrontBoardDisplay>::Display::init(
-        top_board,
+        front_board,
         spi,
         dma,
         &mut display_buffer,

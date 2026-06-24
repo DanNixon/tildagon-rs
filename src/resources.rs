@@ -12,7 +12,7 @@ esp_hal::assign_resources! {
         led: LedResources<'d> {
             data: GPIO21,
         },
-        top_board: TopBoardResources<'d> {
+        front_board: FrontBoardResources<'d> {
             hs_1: GPIO8,
             hs_2: GPIO7,
             hs_3: GPIO2,
