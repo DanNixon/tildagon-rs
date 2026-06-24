@@ -4,20 +4,7 @@
 
 A Rust board support crate for the [Electromagnetic Field](https://www.emfcamp.org/) [Tildagon](https://tildagon.badge.emfcamp.org/) badge.
 
-Still quite early in development and things might change a bit, but very usable for badge creations that will not be reconfigured much.
-
-## Features
-
-- [x] "Low speed" IO driver
-- [x] Hexpansion ports
-- [x] 2024 top board
-   - [x] LEDs
-   - [x] Buttons
-   - [x] Display
-- [x] IMU
-- [ ] Power management
-- [ ] Hexpansion metadata read(/write)
-- [ ] Some form of dynamic hexpansion slot use
+There are still some missing features, but very usable for badge creations that will not be reconfigured much.
 
 ## Development setup
 
