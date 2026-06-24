@@ -41,7 +41,6 @@ jobs:
       matrix:
         example:
           - demo
-          - ethernet-w5500
           - i2c-scan
           - imu
           - sdcard
