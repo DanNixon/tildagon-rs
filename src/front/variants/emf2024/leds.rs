@@ -4,7 +4,7 @@ use crate::{
         leds::{BaseBoardLed, FrontLeds, HexpansionPortLed},
         variants::FrontBoardLeds,
     },
-    hexpansions::HexpansionSlot,
+    hexpansions::HexpansionPort,
 };
 use defmt::Format;
 use smart_leds::RGB8;
@@ -40,14 +40,14 @@ impl BaseBoardLed for <Emf2024FrontBoard as FrontBoardLeds>::PixelBuffer {
 }
 
 impl HexpansionPortLed for <Emf2024FrontBoard as FrontBoardLeds>::PixelBuffer {
-    fn hexpansion_port(&mut self, port: HexpansionSlot) -> &mut RGB8 {
+    fn hexpansion_port(&mut self, port: HexpansionPort) -> &mut RGB8 {
         let pixel = match port {
-            HexpansionSlot::A => Pixel::HexpansionA,
-            HexpansionSlot::B => Pixel::HexpansionB,
-            HexpansionSlot::C => Pixel::HexpansionC,
-            HexpansionSlot::D => Pixel::HexpansionD,
-            HexpansionSlot::E => Pixel::HexpansionE,
-            HexpansionSlot::F => Pixel::HexpansionF,
+            HexpansionPort::A => Pixel::HexpansionA,
+            HexpansionPort::B => Pixel::HexpansionB,
+            HexpansionPort::C => Pixel::HexpansionC,
+            HexpansionPort::D => Pixel::HexpansionD,
+            HexpansionPort::E => Pixel::HexpansionE,
+            HexpansionPort::F => Pixel::HexpansionF,
         };
         self.pixel(pixel as usize).unwrap()
     }

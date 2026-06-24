@@ -1,4 +1,4 @@
-use crate::hexpansions::HexpansionSlot;
+use crate::hexpansions::HexpansionPort;
 use smart_leds::RGB8;
 
 pub struct PixelBuffer<const N: usize>([RGB8; N]);
@@ -28,7 +28,7 @@ pub trait BaseBoardLed {
 }
 
 pub trait HexpansionPortLed {
-    fn hexpansion_port(&mut self, port: HexpansionSlot) -> &mut RGB8;
+    fn hexpansion_port(&mut self, port: HexpansionPort) -> &mut RGB8;
 }
 
 pub trait FrontLeds {

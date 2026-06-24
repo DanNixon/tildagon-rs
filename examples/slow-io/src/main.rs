@@ -14,7 +14,7 @@ use static_cell::StaticCell;
 use tildagon::{
     embedded_aw9523::PinConfiguration,
     esp_hal::{self, clock::CpuClock, timer::timg::TimerGroup},
-    hexpansions::{HexpansionSlot, HexpansionSlotControl},
+    hexpansions::{HexpansionPort, HexpansionPortControl},
     i2c::SharedI2cBus,
     pins::PinControl,
     resources::*,
@@ -55,7 +55,7 @@ async fn main(_spawner: Spawner) {
     let mut usb_sw = UsbSwitch::new(pins.usb);
     usb_sw.set(UsbPort::In).await.unwrap();
 
-    let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
+    let mut hex_slots = HexpansionPortControl::new(pins.hexpansion_detect)
         .await
         .unwrap();
 
@@ -65,27 +65,27 @@ async fn main(_spawner: Spawner) {
     Timer::after_millis(500).await;
 
     hex_slots
-        .set_enabled(HexpansionSlot::A, true)
+        .set_enabled(HexpansionPort::A, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::B, true)
+        .set_enabled(HexpansionPort::B, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::C, true)
+        .set_enabled(HexpansionPort::C, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::D, true)
+        .set_enabled(HexpansionPort::D, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::E, true)
+        .set_enabled(HexpansionPort::E, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::F, true)
+        .set_enabled(HexpansionPort::F, true)
         .await
         .unwrap();
 

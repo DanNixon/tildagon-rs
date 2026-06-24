@@ -55,7 +55,7 @@ pub struct Pins<SysI2C> {
     pub usb: UsbPins<SysI2C>,
     pub imu: ImuPins<SysI2C>,
     pub led: LedPins<SysI2C>,
-    pub top_board: TopBoardPins<SysI2C>,
+    pub front_board: FrontBoardPins<SysI2C>,
     pub hexpansion_detect: HexpansionDetectPins<SysI2C>,
     pub buttons: ButtonPins<SysI2C>,
     pub hexpansion_a: HexpansionAPins<SysI2C>,
@@ -88,7 +88,7 @@ where
             led: LedPins {
                 power_enable: addr5a_pins.port0_pin2.try_into_output().await?,
             },
-            top_board: TopBoardPins {
+            front_board: FrontBoardPins {
                 ls_1: addr5a_pins.port1_pin7,
                 ls_2: addr5a_pins.port1_pin6,
             },
@@ -170,7 +170,7 @@ pub struct LedPins<SysI2C> {
     pub power_enable: Output<SysI2C>,
 }
 
-pub struct TopBoardPins<SysI2C> {
+pub struct FrontBoardPins<SysI2C> {
     pub ls_1: Input<SysI2C>,
     pub ls_2: Input<SysI2C>,
 }

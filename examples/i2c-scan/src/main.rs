@@ -14,11 +14,11 @@ use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
     esp_hal::{self, clock::CpuClock, timer::timg::TimerGroup},
-    hexpansions::{HexpansionEepromHeader, HexpansionSlot, HexpansionSlotControl},
+    hexpansions::{HexpansionEepromHeader, HexpansionPort, HexpansionPortControl},
     i2c::{
-        HexpansionAI2cBus, HexpansionBI2cBus, HexpansionCI2cBus, HexpansionDI2cBus,
-        HexpansionEI2cBus, HexpansionFI2cBus, SharedI2cBus, SharedI2cDevice, SystemI2cBus,
-        TopBoardI2cBus,
+        FrontBoardI2cBus, HexpansionAI2cBus, HexpansionBI2cBus, HexpansionCI2cBus,
+        HexpansionDI2cBus, HexpansionEI2cBus, HexpansionFI2cBus, SharedI2cBus, SharedI2cDevice,
+        SystemI2cBus,
     },
     pins::PinControl,
     resources::*,
@@ -61,8 +61,8 @@ async fn main(_spawner: Spawner) {
 
     static I2C_SYSTEM: StaticCell<SharedI2cBus<SystemI2cBus>> = StaticCell::new();
     let i2c_system = I2C_SYSTEM.init(tildagon::i2c::system_i2c_bus(i2c_bus));
-    static I2C_TOP: StaticCell<SharedI2cBus<TopBoardI2cBus>> = StaticCell::new();
-    let i2c_top = I2C_TOP.init(tildagon::i2c::top_i2c_bus(i2c_bus));
+    static I2C_TOP: StaticCell<SharedI2cBus<FrontBoardI2cBus>> = StaticCell::new();
+    let i2c_front = I2C_TOP.init(tildagon::i2c::front_i2c_bus(i2c_bus));
     static I2C_HEX_A: StaticCell<SharedI2cBus<HexpansionAI2cBus>> = StaticCell::new();
     let i2c_hex_a = I2C_HEX_A.init(tildagon::i2c::hexpansion_a_i2c_bus(i2c_bus));
     static I2C_HEX_B: StaticCell<SharedI2cBus<HexpansionBI2cBus>> = StaticCell::new();
@@ -82,37 +82,37 @@ async fn main(_spawner: Spawner) {
     let mut usb_sw = UsbSwitch::new(pins.usb);
     usb_sw.set(UsbPort::In).await.unwrap();
 
-    let mut hex_slots = HexpansionSlotControl::new(pins.hexpansion_detect)
+    let mut hex_slots = HexpansionPortControl::new(pins.hexpansion_detect)
         .await
         .unwrap();
 
     hex_slots
-        .set_enabled(HexpansionSlot::A, true)
+        .set_enabled(HexpansionPort::A, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::B, true)
+        .set_enabled(HexpansionPort::B, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::C, true)
+        .set_enabled(HexpansionPort::C, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::D, true)
+        .set_enabled(HexpansionPort::D, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::E, true)
+        .set_enabled(HexpansionPort::E, true)
         .await
         .unwrap();
     hex_slots
-        .set_enabled(HexpansionSlot::F, true)
+        .set_enabled(HexpansionPort::F, true)
         .await
         .unwrap();
 
     {
-        let mut top_eeprom = tildagon::eeprom::detect_eeprom(SharedI2cDevice::new(i2c_top))
+        let mut top_eeprom = tildagon::eeprom::detect_eeprom(SharedI2cDevice::new(i2c_front))
             .await
             .unwrap();
 
@@ -156,7 +156,7 @@ async fn main(_spawner: Spawner) {
 
     loop {
         scan_and_report!(i2c_system, "System");
-        scan_and_report!(i2c_top, "Top Board");
+        scan_and_report!(i2c_front, "Top Board");
         scan_and_report!(i2c_hex_a, "Hexpansion A");
         scan_and_report!(i2c_hex_b, "Hexpansion B");
         scan_and_report!(i2c_hex_c, "Hexpansion C");
