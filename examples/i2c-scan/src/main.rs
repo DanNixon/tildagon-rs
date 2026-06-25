@@ -5,16 +5,19 @@
     reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
     holding buffers for the duration of a data transfer."
 )]
+#![allow(unused_imports)]
 
 use defmt::{info, warn};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Ticker};
-use embedded_storage::ReadStorage;
+use embedded_storage::{ReadStorage, Storage};
 use panic_rtt_target as _;
 use static_cell::StaticCell;
 use tildagon::{
     esp_hal::{self, clock::CpuClock, timer::timg::TimerGroup},
-    hexpansions::{HexpansionEepromHeader, HexpansionPort, HexpansionPortControl},
+    hexpansions::{
+        HexpansionEepromHeader, HexpansionManifestVersion, HexpansionPort, HexpansionPortControl,
+    },
     i2c::{
         FrontBoardI2cBus, HexpansionAI2cBus, HexpansionBI2cBus, HexpansionCI2cBus,
         HexpansionDI2cBus, HexpansionEI2cBus, HexpansionFI2cBus, SharedI2cBus, SharedI2cDevice,
@@ -130,24 +133,28 @@ async fn main(_spawner: Spawner) {
 
     if let Ok(mut a_eeprom) = tildagon::eeprom::detect_eeprom(SharedI2cDevice::new(i2c_hex_a)).await
     {
-        // let header = HexpansionEepromHeader {
-        //     version: HexpansionManifestVersion::V2024,
-        //     filesystem_offset: 64,
-        //     eeprom_page_size: 64,
-        //     eeprom_total_size: 8_192,
-        //     vid: 0x5100,
-        //     pid: 0xB00B,
-        //     uid: 0,
-        //     friendly_name: "wabbit".try_into().unwrap(),
-        // };
+        let header = HexpansionEepromHeader {
+            version: HexpansionManifestVersion::V2024,
+            filesystem_offset: 32,
+            eeprom_page_size: 32,
+            eeprom_total_size: 8_192,
+            vid: 0x7588,
+            pid: 0x025D,
+            uid: 0,
+            friendly_name: "Dual uSD".try_into().unwrap(),
+        };
 
-        // let bytes = header.to_bytes();
+        #[allow(unused_variables)]
+        let bytes = header.to_bytes();
+        // info!("Write: {}", bytes);
         // a_eeprom.write(0, &bytes).unwrap();
 
         let mut buff = [0; 32];
         a_eeprom.read(0, &mut buff).unwrap();
+        info!("Read: {}", buff);
         let header = HexpansionEepromHeader::from_bytes(&buff).unwrap();
         info!("{}", header);
+        info!("PID/VID: 0x{:x}/0x{:x}", header.vid, header.pid);
     } else {
         warn!("(probably) nothing in hexpansion port A");
     }

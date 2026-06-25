@@ -47,7 +47,7 @@ where
         }
 
         let addr = offset.to_le_bytes();
-        let addr = [addr[0], addr[1]];
+        let addr = [addr[1], addr[0]];
 
         self.bus
             .write_read(self.address, &addr, bytes)
@@ -75,7 +75,7 @@ where
 
             let addr = addr.to_le_bytes();
 
-            let buf = [addr[0], addr[1], byte];
+            let buf = [addr[1], addr[0], byte];
 
             self.bus
                 .write(self.address, &buf)
