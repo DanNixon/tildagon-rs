@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.9](https://github.com/DanNixon/tildagon-rs/compare/v0.0.8...v0.0.9) - 2026-07-01
+
+### Fixed
+
+- eeprom address
+
+### Other
+
+- *(deps)* bump actions/checkout from 6 to 7
+- [**breaking**] fix naming conventions
+- *(docs)* remove feature list
+- move dual microsd hexpansion demo firmware
+- move ethernet hexpansion demo firmware
+
 ## [0.0.8](https://github.com/DanNixon/tildagon-rs/compare/v0.0.7...v0.0.8) - 2026-06-22
 
 ### Added
