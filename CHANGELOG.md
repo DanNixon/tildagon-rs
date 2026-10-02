@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.10](https://github.com/DanNixon/tildagon-rs/compare/v0.0.9...v0.0.10) - 2026-10-02
+
+### Other
+
+- *(deps)* bump DeterminateSystems/nix-installer-action from 22 to 23
+
 ## [0.0.9](https://github.com/DanNixon/tildagon-rs/compare/v0.0.8...v0.0.9) - 2026-07-01
 
 ### Fixed
